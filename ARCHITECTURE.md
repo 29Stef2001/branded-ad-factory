@@ -40,9 +40,26 @@ from `src/lib/env.ts`, and add new variables to its schema when a feature needs 
 - `src/lib/supabase/client.ts` — browser client, for Client Components.
 - `src/lib/supabase/server.ts` — cookie-aware client for Server Components/Actions.
 - `src/lib/supabase/middleware.ts` — session-refresh helper, invoked from `src/proxy.ts` on every request.
+  Returns `{ response, user }` so `src/proxy.ts` can make route-protection decisions without a second
+  auth check.
 
 `SUPABASE_SERVICE_ROLE_KEY` is intentionally not configured yet — add it to `src/lib/env.ts`'s server schema
-only once a server-only/admin feature actually needs it.
+only once a server-only/admin feature actually needs it. Auth (`src/features/auth`) never uses it: new
+`public.profiles` rows are created by a database trigger (`supabase/migrations/`), not app code.
+
+## Authentication
+
+`src/features/auth` is the first feature built on the `domain/application/infrastructure/ui` convention:
+
+- Email/password registration, login, logout, forgot-password, and reset-password, plus a `GET
+/auth/callback` route handler that exchanges a Supabase PKCE `code` for a session (used by both the
+  signup-confirmation and password-reset email links).
+- Route protection lives in `src/proxy.ts`: unauthenticated users hitting `/dashboard` or
+  `/reset-password` are redirected to `/login`; authenticated users hitting `/login`, `/register`, or
+  `/forgot-password` are redirected to `/dashboard`. `/reset-password` is deliberately excluded from the
+  latter rule since Supabase's recovery link signs the user into a temporary session before they land there.
+- `NEXT_PUBLIC_SITE_URL` (added to `src/lib/env.ts`) builds the absolute `emailRedirectTo`/`redirectTo`
+  URLs used in signup-confirmation and password-reset emails.
 
 ## Follow-ups (deliberately not done during scaffolding)
 

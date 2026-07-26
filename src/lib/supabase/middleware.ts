@@ -26,7 +26,9 @@ export async function updateSession(request: NextRequest) {
 
   // No code between createServerClient and getUser() — required so the
   // session is actually refreshed rather than read from a stale cookie.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return { response: supabaseResponse, user };
 }
