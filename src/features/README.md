@@ -13,5 +13,6 @@ contain business logic directly. Server Actions colocated under a feature's `app
 default mutation pattern (see `ARCHITECTURE.md`); `src/app/api/**` route handlers are reserved for cases
 needing an external HTTP contract (webhooks, non-Next consumers).
 
-`auth` (email/password authentication, session management) is the first feature built on this convention —
-see `src/features/auth/` for a concrete example of the layering in practice.
+`auth` (email/password authentication, session management), `competitor-analysis` (Meta Ad Library
+ingestion + Claude-generated ad analysis), and `ad-concepts` (brand profile + Claude-generated ad concepts)
+are built on this convention — see any of them for a concrete example of the layering in practice.

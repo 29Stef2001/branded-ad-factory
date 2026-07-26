@@ -61,6 +61,58 @@ only once a server-only/admin feature actually needs it. Auth (`src/features/aut
 - `NEXT_PUBLIC_SITE_URL` (added to `src/lib/env.ts`) builds the absolute `emailRedirectTo`/`redirectTo`
   URLs used in signup-confirmation and password-reset emails.
 
+## Competitor ad analysis
+
+`src/features/competitor-analysis` tracks a competitor's Meta (Facebook/Instagram) Page and pulls their
+ads from the public Meta Ad Library API (`ads_archive`), then generates AI analysis of each ad's copy on
+demand:
+
+- **Ingestion is fetch-on-add**: adding a competitor (name + numeric Meta Page ID) immediately calls the
+  Ad Library API server-side and upserts the returned ads by `meta_ad_archive_id`. There is no background
+  job — a manual "refresh" action can be added later if needed.
+- **Analysis is on-demand per ad**, not automatic, to keep Claude API spend intentional.
+- **Text only, not vision**: the Ad Library API's `ArchivedAd` object has no direct image/video URL field
+  (only `ad_snapshot_url`, a link to Meta's own HTML preview page) — so analysis works from ad copy text
+  only. `ad_snapshot_url` is surfaced as a "view original ad" link. Real visual analysis is a future
+  enhancement, not built here.
+- **Claude integration** (`infrastructure/claude-analysis-client.ts`): uses `client.messages.parse()` with
+  `zodOutputFormat()` for guaranteed structured output (messaging angle, hook, tone, target audience, CTA,
+  summary) — no manual JSON parsing. Model is `claude-opus-5`.
+- **Secrets**: `ANTHROPIC_API_KEY` and `META_AD_LIBRARY_ACCESS_TOKEN` live in `src/lib/env.ts`'s server
+  schema only — never exposed to the client.
+- RLS scopes `competitors` → `competitor_ads` → `ad_analyses` back to `auth.uid()` through
+  `competitors.user_id`, so a user only ever sees their own tracked competitors.
+- **Meta requires identity verification for Ad Library API access** — confirmed empirically, not
+  documented on the `ads_archive` reference page. A bare App Access Token (`{id}|{secret}`) is rejected
+  with `error_subcode 2332004` ("App role required"); a User Access Token from the app's own Admin gets
+  further but still fails with `error_subcode 2332002` ("Authorization and login needed... follow the
+  steps at facebook.com/ads/library/api") until that Facebook account has completed Meta's identity
+  confirmation process. This is a one-time step on the token owner's Facebook account, not something the
+  app can do programmatically — do this before expecting real ad data to return.
+
+## Ad concept generation
+
+`src/features/ad-concepts` generates original, on-brand ad concepts from a campaign brief, optionally
+informed by a competitor ad already analyzed by `competitor-analysis`:
+
+- **One brand profile per user** (`brand_profiles`, unique on `user_id`) supplies the context — brand
+  name, industry, tone, target audience, unique selling points — every generation call needs. All fields
+  are required; a partial profile produces generic output.
+- **Generation, not automation**: a campaign brief plus an optional "inspiration" pick from the user's
+  already-analyzed competitor ads. When an inspiration ad is picked, the prompt explicitly instructs
+  Claude to take a _different_ messaging angle than that competitor, turning Phase 2's analysis into real
+  input rather than a filed-away report.
+- **Fixed batch of 3 concepts** per generation, via a single `client.messages.parse()` call with
+  `zodOutputFormat()` returning `{ concepts: [...] }` — same structured-output pattern as
+  `competitor-analysis`, at `effort: "high"` (vs. `medium` for ad-copy analysis) since creative generation
+  benefits more from deeper reasoning than straightforward extraction.
+- **Cross-feature reads happen at the database, not the code level**: `ad-concepts`' own repository
+  queries `competitor_ads` / `ad_analyses` / `competitors` directly for the inspiration list, rather than
+  importing `competitor-analysis`'s repository functions — keeps the two features loosely coupled.
+- Text/creative-direction only (headline, hook, body copy, written visual direction, CTA) — no image
+  generation. Both `brand_profiles` and `ad_concepts` are owned directly by `user_id` (RLS), unlike
+  `competitor_ads`' indirect ownership through `competitors`.
+
 ## Follow-ups (deliberately not done during scaffolding)
 
 - **`src/types/supabase.ts`** — generate once a real Supabase project is linked:
