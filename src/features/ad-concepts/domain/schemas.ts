@@ -56,7 +56,10 @@ export const brandAssetTypeEnum = z.enum([
 export const brandAssetSchema = z.object({
   assetType: brandAssetTypeEnum,
   label: z.string().trim().min(1).optional(),
-  imageUrl: z.string().trim().url("Enter a valid URL"),
+  // Optional because an asset may instead be an uploaded file, which the
+  // action resolves to a storage path. Exactly one of the two ends up set —
+  // the table enforces that with a check constraint.
+  imageUrl: z.string().trim().url("Enter a valid URL").optional(),
   isPrimary: z.boolean().default(false),
   isActive: z.boolean().default(true),
   region: z.string().trim().min(1).optional(),

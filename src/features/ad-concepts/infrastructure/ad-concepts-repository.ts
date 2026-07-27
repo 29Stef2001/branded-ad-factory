@@ -31,13 +31,23 @@ export type BrandAssetRow = {
   id: string;
   asset_type: BrandAssetType;
   label: string | null;
-  image_url: string;
+  /** Null when the asset was uploaded rather than linked. */
+  image_url: string | null;
+  /** Null when the asset was linked rather than uploaded. */
+  storage_path: string | null;
   is_primary: boolean;
   is_active: boolean;
   region: string | null;
   season: string | null;
   sort_order: number;
 };
+
+/**
+ * A row plus whatever URL should actually be rendered for it — a fresh signed
+ * URL for uploads, the stored link otherwise. Resolved server-side per request,
+ * the same shape the concepts page already uses for creative images.
+ */
+export type BrandAssetWithUrl = BrandAssetRow & { displayUrl: string | null };
 
 export type ApprovedMessageRow = {
   id: string;
@@ -454,7 +464,12 @@ export async function insertRefinedConcept(
 // ---------------------------------------------------------------------------
 
 const BRAND_ASSET_SELECT =
-  "id, asset_type, label, image_url, is_primary, is_active, region, season, sort_order";
+  "id, asset_type, label, image_url, storage_path, is_primary, is_active, region, season, sort_order";
+
+const BRAND_ASSETS_BUCKET = "brand-assets";
+
+/** Signed URLs are minted per render; an hour outlives any realistic page view. */
+const SIGNED_URL_TTL_SECONDS = 3600;
 
 export async function listBrandAssets(): Promise<BrandAssetRow[]> {
   const supabase = await createClient();
@@ -466,6 +481,86 @@ export async function listBrandAssets(): Promise<BrandAssetRow[]> {
 
   if (error) throw error;
   return data as BrandAssetRow[];
+}
+
+/**
+ * Assets with their render URLs resolved in one batch, so a page with twenty
+ * uploaded assets signs twenty paths in a single round trip rather than twenty.
+ */
+export async function listBrandAssetsWithUrls(): Promise<BrandAssetWithUrl[]> {
+  const assets = await listBrandAssets();
+
+  const paths = assets
+    .map((asset) => asset.storage_path)
+    .filter((path): path is string => path !== null);
+
+  const signed = await getSignedBrandAssetUrls(paths);
+
+  return assets.map((asset) => ({
+    ...asset,
+    displayUrl: asset.storage_path
+      ? (signed.get(asset.storage_path) ?? null)
+      : asset.image_url,
+  }));
+}
+
+async function getSignedBrandAssetUrls(
+  paths: string[],
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from(BRAND_ASSETS_BUCKET)
+    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+
+  if (error) throw error;
+
+  const urls = new Map<string, string>();
+  for (const entry of data) {
+    if (entry.path && entry.signedUrl) urls.set(entry.path, entry.signedUrl);
+  }
+  return urls;
+}
+
+export async function uploadBrandAssetFile(
+  userId: string,
+  file: File,
+): Promise<string> {
+  const supabase = await createClient();
+
+  // The path is prefixed with the user id because that first segment is what
+  // the storage RLS policy checks; the random suffix keeps two uploads of the
+  // same filename from overwriting each other.
+  const extension = file.name.split(".").pop()?.toLowerCase() || "bin";
+  const path = `${userId}/${crypto.randomUUID()}.${extension}`;
+
+  const { error } = await supabase.storage
+    .from(BRAND_ASSETS_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+
+  if (error) throw error;
+  return path;
+}
+
+/**
+ * Best-effort cleanup so deleting an asset doesn't strand its file in the
+ * bucket. Failure is swallowed deliberately: an orphaned object costs storage,
+ * whereas surfacing the error would leave the user staring at a row they
+ * already deleted, wondering whether it worked.
+ */
+export async function removeBrandAssetFile(path: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.storage
+    .from(BRAND_ASSETS_BUCKET)
+    .remove([path]);
+
+  // Logged rather than thrown, and never silent: the user has already deleted
+  // the row and surfacing this would only confuse them, but a cleanup that
+  // fails without a trace leaves orphaned files nobody ever finds.
+  if (error) {
+    console.error("Failed to remove brand asset file", { path, error });
+  }
 }
 
 export async function listActiveBrandAssets(): Promise<BrandAssetRow[]> {
@@ -498,7 +593,9 @@ async function unsetExistingPrimary(
 export async function createBrandAsset(input: {
   assetType: BrandAssetType;
   label?: string;
-  imageUrl: string;
+  /** Exactly one of imageUrl / storagePath, matching the table's check constraint. */
+  imageUrl?: string;
+  storagePath?: string;
   isPrimary: boolean;
   isActive: boolean;
   region?: string;
@@ -516,7 +613,8 @@ export async function createBrandAsset(input: {
     brand_profile_id: brandProfileId,
     asset_type: input.assetType,
     label: input.label ?? null,
-    image_url: input.imageUrl,
+    image_url: input.imageUrl ?? null,
+    storage_path: input.storagePath ?? null,
     is_primary: input.isPrimary,
     is_active: input.isActive,
     region: input.region ?? null,
@@ -531,6 +629,7 @@ export async function updateBrandAsset(
   input: {
     label?: string;
     imageUrl?: string;
+    storagePath?: string;
     isPrimary?: boolean;
     isActive?: boolean;
     region?: string;
@@ -556,11 +655,21 @@ export async function updateBrandAsset(
     }
   }
 
+  // Swapping the image source has to clear the other column: the table's check
+  // constraint allows exactly one of image_url / storage_path to be set, so
+  // writing one without nulling the other would be rejected outright.
+  const imageSource =
+    input.storagePath !== undefined
+      ? { storage_path: input.storagePath, image_url: null }
+      : input.imageUrl !== undefined
+        ? { image_url: input.imageUrl, storage_path: null }
+        : {};
+
   const { error } = await supabase
     .from("brand_assets")
     .update({
       ...(input.label !== undefined && { label: input.label }),
-      ...(input.imageUrl !== undefined && { image_url: input.imageUrl }),
+      ...imageSource,
       ...(input.isPrimary !== undefined && { is_primary: input.isPrimary }),
       ...(input.isActive !== undefined && { is_active: input.isActive }),
       ...(input.region !== undefined && { region: input.region }),
@@ -573,8 +682,19 @@ export async function updateBrandAsset(
 
 export async function deleteBrandAsset(id: string): Promise<void> {
   const supabase = await createClient();
+
+  // Read the path before deleting the row — afterwards there is nothing left
+  // pointing at the file, and it would sit in the bucket forever.
+  const { data: existing } = await supabase
+    .from("brand_assets")
+    .select("storage_path")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase.from("brand_assets").delete().eq("id", id);
   if (error) throw error;
+
+  if (existing?.storage_path) await removeBrandAssetFile(existing.storage_path);
 }
 
 export async function reorderBrandAsset(

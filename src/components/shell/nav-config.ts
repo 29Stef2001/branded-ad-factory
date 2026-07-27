@@ -115,9 +115,7 @@ export const NAV_TREE: NavEntry[] = [
       {
         label: "Brand Assets",
         segment: "creative-studio/brand-assets",
-        status: "soon",
-        blurb:
-          "Logos, packaging, storefront and product imagery. The working Logo URL field on Concepts stays authoritative until this replaces it.",
+        status: "live",
       },
       {
         label: "Image Generator",

@@ -1,16 +1,12 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ImagePlus } from "lucide-react";
+import { DarkPanel } from "@/components/layout/dark-panel";
+import { EmptyState } from "@/components/layout/empty-state";
 import { AddBrandAssetForm } from "@/features/ad-concepts/ui/add-brand-asset-form";
 import { BrandAssetRow } from "@/features/ad-concepts/ui/brand-asset-row";
 import type { BrandAssetType } from "@/features/ad-concepts/domain/schemas";
-import type { BrandAssetRow as BrandAssetRowData } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import type { BrandAssetWithUrl } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
-const ASSET_TYPE_LABELS: Record<BrandAssetType, string> = {
+export const ASSET_TYPE_LABELS: Record<BrandAssetType, string> = {
   logo: "Logo",
   icon: "Icon",
   packaging: "Packaging",
@@ -26,38 +22,44 @@ const ASSET_TYPES = Object.keys(ASSET_TYPE_LABELS) as BrandAssetType[];
 export function BrandAssetsManager({
   assets,
 }: {
-  assets: BrandAssetRowData[];
+  assets: BrandAssetWithUrl[];
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Brand Assets</CardTitle>
-        <CardDescription>
-          Real reference images for your product packaging, storefront, and more
-          — automatically picked for generation based on each concept&apos;s
-          scene.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      {assets.length === 0 && (
+        <EmptyState
+          icon={ImagePlus}
+          title="No brand assets yet"
+          description="Upload a logo, packaging shot or storefront photo below. Generation picks from these automatically, based on what each concept's scene calls for."
+        />
+      )}
+
+      {/* One panel per type rather than a single long list: assets are chosen
+          per type at generation time, so grouping matches how they are used. */}
+      <div className="grid gap-4 xl:grid-cols-2">
         {ASSET_TYPES.map((assetType) => {
           const assetsOfType = assets.filter((a) => a.asset_type === assetType);
+          const label = ASSET_TYPE_LABELS[assetType];
+
           return (
-            <div key={assetType} className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold">
-                {ASSET_TYPE_LABELS[assetType]}
-              </h3>
-              {assetsOfType.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {assetsOfType.map((asset) => (
-                    <BrandAssetRow key={asset.id} asset={asset} />
-                  ))}
-                </div>
-              )}
-              <AddBrandAssetForm assetType={assetType} />
-            </div>
+            <DarkPanel
+              key={assetType}
+              title={label}
+              description={
+                assetsOfType.length === 0
+                  ? "None yet"
+                  : `${assetsOfType.length} ${assetsOfType.length === 1 ? "asset" : "assets"}`
+              }
+              contentClassName="flex flex-col gap-3"
+            >
+              {assetsOfType.map((asset) => (
+                <BrandAssetRow key={asset.id} asset={asset} />
+              ))}
+              <AddBrandAssetForm assetType={assetType} typeLabel={label} />
+            </DarkPanel>
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

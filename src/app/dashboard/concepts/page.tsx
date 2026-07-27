@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -6,17 +7,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DarkPanel } from "@/components/layout/dark-panel";
+import { buttonVariants } from "@/components/ui/button";
 import { BrandProfileForm } from "@/features/ad-concepts/ui/brand-profile-form";
 import { GenerateConceptsForm } from "@/features/ad-concepts/ui/generate-concepts-form";
 import { ConceptCard } from "@/features/ad-concepts/ui/concept-card";
-import { BrandAssetsManager } from "@/features/ad-concepts/ui/brand-assets-manager";
 import { ApprovedMessagesManager } from "@/features/ad-concepts/ui/approved-messages-manager";
 import {
   getBrandProfile,
   getSignedImageUrls,
   listAnalyzedAdsForInspiration,
   listApprovedMessages,
-  listBrandAssets,
   listConcepts,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
@@ -32,19 +33,13 @@ export const metadata: Metadata = {
 export const maxDuration = 300;
 
 export default async function ConceptsPage() {
-  const [
-    brandProfile,
-    inspirationOptions,
-    concepts,
-    brandAssets,
-    approvedMessages,
-  ] = await Promise.all([
-    getBrandProfile(),
-    listAnalyzedAdsForInspiration(),
-    listConcepts(),
-    listBrandAssets(),
-    listApprovedMessages(),
-  ]);
+  const [brandProfile, inspirationOptions, concepts, approvedMessages] =
+    await Promise.all([
+      getBrandProfile(),
+      listAnalyzedAdsForInspiration(),
+      listConcepts(),
+      listApprovedMessages(),
+    ]);
 
   const imagePaths = concepts
     .map((concept) => concept.creative_image_path)
@@ -91,7 +86,21 @@ export default async function ConceptsPage() {
 
           {brandProfile && (
             <>
-              <BrandAssetsManager assets={brandAssets} />
+              <DarkPanel
+                title="Brand Assets"
+                description="Reference images used automatically during image generation."
+                actions={
+                  <Link
+                    href="/dashboard/creative-studio/brand-assets"
+                    className={buttonVariants({
+                      size: "sm",
+                      variant: "outline",
+                    })}
+                  >
+                    Manage assets
+                  </Link>
+                }
+              />
               <ApprovedMessagesManager messages={approvedMessages} />
             </>
           )}
