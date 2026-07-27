@@ -151,6 +151,37 @@ null`) — a refinement is a new row pointing back at the concept it came from, 
 - `/dashboard/agents`'s "Concept Generator" and "Concept Refiner" cards are counted as mutually exclusive
   (`refined_from_concept_id is null` vs. `is not null`) so the two numbers sum to the true total.
 
+## Ad performance tracking
+
+`src/features/ad-performance` lets a user connect their own Meta ad account (read-only) and see recent
+performance — deliberately different from `competitor-analysis`, which reads _other_ businesses' public ad
+data via a server-held token. This is the first feature involving a per-user OAuth connection to a third
+party:
+
+- **Facebook Login for Business, not classic Facebook Login.** Its OAuth dialog takes a `config_id` (from
+  a Login Configuration created in the Meta app dashboard, requesting `ads_read`) instead of a `scope`
+  parameter — confirmed against Meta's current docs before building, since assuming the classic flow would
+  have silently failed.
+- **The connect flow is two Route Handlers, not a Server Action**, because Server Actions can't receive the
+  `GET` + query-string redirects that both starting and completing an OAuth flow require:
+  - `src/app/api/meta/oauth/start/route.ts` — sets a random CSRF `state` value in an httpOnly cookie, then
+    redirects to Meta's authorize URL.
+  - `src/app/api/meta/oauth/callback/route.ts` — verifies `state` against that cookie, exchanges the code
+    for a short-lived then a long-lived (~60 day) token, fetches the user's ad accounts (auto-selecting the
+    first), and saves the connection.
+  - The callback identifies _which app user_ is connecting via the existing Supabase session cookie
+    (`createClient()` + `getUser()`), not by encoding identity in `state` — a top-level browser redirect
+    back to our own domain still carries our session cookies.
+- **`meta_ad_account_connections`** is one row per user (unique on `user_id`), RLS-scoped directly to
+  `auth.uid()` (same shape as `brand_profiles`).
+- **No token refresh automation and no multi-account picker yet** — both are documented fast-follows, not
+  silent omissions. When a stored token has expired, `/dashboard/performance` shows a reconnect prompt
+  rather than failing silently.
+- **Access tokens are stored as plain `text`**, protected only by RLS and Postgres/Supabase's at-rest
+  encryption — not separately encrypted at the column level. Acceptable for a v1 with `ads_read`-scoped
+  tokens (read-only, can't spend money or modify campaigns), but worth revisiting with something like
+  Supabase Vault before this handles many real users' tokens.
+
 ## Follow-ups (deliberately not done during scaffolding)
 
 - **`src/types/supabase.ts`** — generate once a real Supabase project is linked:

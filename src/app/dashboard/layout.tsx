@@ -32,6 +32,12 @@ export default function DashboardLayout({
           >
             Agents
           </Link>
+          <Link
+            href="/dashboard/performance"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Performance
+          </Link>
         </div>
         <LogoutButton />
       </header>
