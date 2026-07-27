@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Concept } from "@/features/ad-concepts/domain/schemas";
+import type {
+  BrandAssetType,
+  Concept,
+  ConceptV2,
+} from "@/features/ad-concepts/domain/schemas";
+
+export type BrandColors = {
+  primary?: string;
+  secondary?: string;
+  accent?: string;
+  background?: string;
+};
 
 export type BrandProfile = {
   brand_name: string;
@@ -8,6 +19,50 @@ export type BrandProfile = {
   target_audience: string;
   unique_selling_points: string;
   logo_image_url: string | null;
+  brand_colors: BrandColors | null;
+  typography_notes: string | null;
+  emboss_style: string | null;
+  emboss_custom_notes: string | null;
+  foil_style: string | null;
+  foil_custom_notes: string | null;
+};
+
+export type BrandAssetRow = {
+  id: string;
+  asset_type: BrandAssetType;
+  label: string | null;
+  image_url: string;
+  is_primary: boolean;
+  is_active: boolean;
+  region: string | null;
+  season: string | null;
+  sort_order: number;
+};
+
+export type ApprovedMessageRow = {
+  id: string;
+  message: string;
+  is_active: boolean;
+  sort_order: number;
+  category: string | null;
+  usage_notes: string | null;
+  region: string | null;
+  campaign: string | null;
+};
+
+export type CreativeGenerationRow = {
+  id: string;
+  concept_id: string;
+  attempt_number: number;
+  status: string;
+  image_path: string | null;
+  selected_reference_roles: string[];
+  qa_scores: Record<string, number> | null;
+  qa_passed: boolean | null;
+  qa_notes: string | null;
+  retry_reason: string | null;
+  failure_reason: string | null;
+  created_at: string;
 };
 
 export type InspirationOption = {
@@ -27,8 +82,14 @@ export type ConceptRow = {
   created_at: string;
   creative_image_path: string | null;
   product_image_url: string | null;
+  strategy_type: string | null;
+  campaign_angle: string | null;
+  brand_asset_requirements: string[];
+  generation_status: string | null;
+  generation_retry_count: number;
   competitor_ads: { competitors: { name: string } | null } | null;
   original: { headline: string } | null;
+  promotional_message: { message: string } | null;
 };
 
 const CREATIVE_IMAGES_BUCKET = "ad-creative-images";
@@ -38,12 +99,23 @@ export async function getBrandProfile(): Promise<BrandProfile | null> {
   const { data, error } = await supabase
     .from("brand_profiles")
     .select(
-      "brand_name, industry, tone, target_audience, unique_selling_points, logo_image_url",
+      "brand_name, industry, tone, target_audience, unique_selling_points, logo_image_url, brand_colors, typography_notes, emboss_style, emboss_custom_notes, foil_style, foil_custom_notes",
     )
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data as BrandProfile | null;
+}
+
+async function getBrandProfileId(): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brand_profiles")
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.id ?? null;
 }
 
 export async function upsertBrandProfile(
@@ -55,6 +127,12 @@ export async function upsertBrandProfile(
     targetAudience: string;
     uniqueSellingPoints: string;
     logoImageUrl?: string;
+    brandColors?: BrandColors;
+    typographyNotes?: string;
+    embossStyle?: string;
+    embossCustomNotes?: string;
+    foilStyle?: string;
+    foilCustomNotes?: string;
   },
 ) {
   const supabase = await createClient();
@@ -67,6 +145,12 @@ export async function upsertBrandProfile(
       target_audience: profile.targetAudience,
       unique_selling_points: profile.uniqueSellingPoints,
       logo_image_url: profile.logoImageUrl ?? null,
+      brand_colors: profile.brandColors ?? null,
+      typography_notes: profile.typographyNotes ?? null,
+      emboss_style: profile.embossStyle ?? "none",
+      emboss_custom_notes: profile.embossCustomNotes ?? null,
+      foil_style: profile.foilStyle ?? "none",
+      foil_custom_notes: profile.foilCustomNotes ?? null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
@@ -133,15 +217,39 @@ export async function getInspirationAd(
   };
 }
 
+// Resolves a concept's chosen promotional message to its row id by exact text
+// match. Claude is instructed to return one of the brand's enabled messages
+// verbatim; this is the app-side enforcement that it actually did, per "never
+// invent promotional copy outside the approved list" — a non-match means the
+// concept is inserted with no linked message rather than silently trusting an
+// unapproved string.
+async function findApprovedMessageIdByText(
+  brandProfileId: string,
+  message: string,
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("approved_promotional_messages")
+    .select("id")
+    .eq("brand_profile_id", brandProfileId)
+    .eq("message", message)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
 export async function insertConcepts(
   userId: string,
   brief: string,
   inspirationAdId: string | null,
-  concepts: Concept[],
+  concepts: ConceptV2[],
 ) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("ad_concepts").insert(
-    concepts.map((concept) => ({
+  const brandProfileId = await getBrandProfileId();
+  if (!brandProfileId) throw new Error("Brand profile not found.");
+
+  const rows = await Promise.all(
+    concepts.map(async (concept) => ({
       user_id: userId,
       brief,
       inspired_by_ad_id: inspirationAdId,
@@ -150,19 +258,44 @@ export async function insertConcepts(
       body_copy: concept.bodyCopy,
       visual_direction: concept.visualDirection,
       call_to_action: concept.callToAction,
+      strategy_type: concept.strategyType,
+      campaign_angle: concept.campaignAngle,
+      promotional_message_id: await findApprovedMessageIdByText(
+        brandProfileId,
+        concept.primaryPromotionalMessage,
+      ),
+      brand_asset_requirements: concept.brandAssetRequirements,
+      structured_concept: {
+        emotionalDriver: concept.emotionalDriver,
+        scene: concept.scene,
+        subject: concept.subject,
+        productPlacement: concept.productPlacement,
+        messagePlacement: concept.messagePlacement,
+        cameraStyle: concept.cameraStyle,
+        lighting: concept.lighting,
+        composition: concept.composition,
+        textStyle: concept.textStyle,
+        elementsToPreserve: concept.elementsToPreserve,
+        elementsToVary: concept.elementsToVary,
+      },
+      final_generation_prompt: concept.finalGenerationPrompt,
     })),
   );
 
+  const supabase = await createClient();
+  const { error } = await supabase.from("ad_concepts").insert(rows);
+
   if (error) throw error;
 }
+
+const CONCEPT_ROW_SELECT =
+  "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, creative_image_path, product_image_url, strategy_type, campaign_angle, brand_asset_requirements, generation_status, generation_retry_count, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline), promotional_message:approved_promotional_messages(message)";
 
 export async function listConcepts(): Promise<ConceptRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ad_concepts")
-    .select(
-      "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, creative_image_path, product_image_url, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline)",
-    )
+    .select(CONCEPT_ROW_SELECT)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -213,6 +346,47 @@ export async function getConcept(id: string): Promise<ConceptFields | null> {
     bodyCopy: data.body_copy,
     visualDirection: data.visual_direction,
     callToAction: data.call_to_action,
+  };
+}
+
+export type ConceptGenerationInput = {
+  finalGenerationPrompt: string;
+  brandAssetRequirements: string[];
+  promotionalMessage: string | null;
+  messagePlacement: string | null;
+  textStyle: string | null;
+};
+
+export async function getConceptForGeneration(
+  id: string,
+): Promise<ConceptGenerationInput | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ad_concepts")
+    .select(
+      "final_generation_prompt, visual_direction, brand_asset_requirements, structured_concept, promotional_message:approved_promotional_messages(message)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const structured = data.structured_concept as {
+    messagePlacement?: string;
+    textStyle?: string;
+  } | null;
+  const promotionalMessage = data.promotional_message as unknown as {
+    message: string;
+  } | null;
+
+  return {
+    finalGenerationPrompt:
+      data.final_generation_prompt ?? data.visual_direction,
+    brandAssetRequirements: data.brand_asset_requirements ?? [],
+    promotionalMessage: promotionalMessage?.message ?? null,
+    messagePlacement: structured?.messagePlacement ?? null,
+    textStyle: structured?.textStyle ?? null,
   };
 }
 
@@ -271,6 +445,436 @@ export async function insertRefinedConcept(
     visual_direction: concept.visualDirection,
     call_to_action: concept.callToAction,
   });
+
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Brand assets
+// ---------------------------------------------------------------------------
+
+const BRAND_ASSET_SELECT =
+  "id, asset_type, label, image_url, is_primary, is_active, region, season, sort_order";
+
+export async function listBrandAssets(): Promise<BrandAssetRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brand_assets")
+    .select(BRAND_ASSET_SELECT)
+    .order("asset_type", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return data as BrandAssetRow[];
+}
+
+export async function listActiveBrandAssets(): Promise<BrandAssetRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brand_assets")
+    .select(BRAND_ASSET_SELECT)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return data as BrandAssetRow[];
+}
+
+async function unsetExistingPrimary(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  brandProfileId: string,
+  assetType: BrandAssetType,
+) {
+  const { error } = await supabase
+    .from("brand_assets")
+    .update({ is_primary: false })
+    .eq("brand_profile_id", brandProfileId)
+    .eq("asset_type", assetType)
+    .eq("is_primary", true);
+
+  if (error) throw error;
+}
+
+export async function createBrandAsset(input: {
+  assetType: BrandAssetType;
+  label?: string;
+  imageUrl: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  region?: string;
+  season?: string;
+}): Promise<void> {
+  const brandProfileId = await getBrandProfileId();
+  if (!brandProfileId) throw new Error("Brand profile not found.");
+
+  const supabase = await createClient();
+  if (input.isPrimary) {
+    await unsetExistingPrimary(supabase, brandProfileId, input.assetType);
+  }
+
+  const { error } = await supabase.from("brand_assets").insert({
+    brand_profile_id: brandProfileId,
+    asset_type: input.assetType,
+    label: input.label ?? null,
+    image_url: input.imageUrl,
+    is_primary: input.isPrimary,
+    is_active: input.isActive,
+    region: input.region ?? null,
+    season: input.season ?? null,
+  });
+
+  if (error) throw error;
+}
+
+export async function updateBrandAsset(
+  id: string,
+  input: {
+    label?: string;
+    imageUrl?: string;
+    isPrimary?: boolean;
+    isActive?: boolean;
+    region?: string;
+    season?: string;
+  },
+): Promise<void> {
+  const supabase = await createClient();
+
+  if (input.isPrimary) {
+    const { data: existing, error: fetchError } = await supabase
+      .from("brand_assets")
+      .select("brand_profile_id, asset_type")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (existing) {
+      await unsetExistingPrimary(
+        supabase,
+        existing.brand_profile_id,
+        existing.asset_type as BrandAssetType,
+      );
+    }
+  }
+
+  const { error } = await supabase
+    .from("brand_assets")
+    .update({
+      ...(input.label !== undefined && { label: input.label }),
+      ...(input.imageUrl !== undefined && { image_url: input.imageUrl }),
+      ...(input.isPrimary !== undefined && { is_primary: input.isPrimary }),
+      ...(input.isActive !== undefined && { is_active: input.isActive }),
+      ...(input.region !== undefined && { region: input.region }),
+      ...(input.season !== undefined && { season: input.season }),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function deleteBrandAsset(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("brand_assets").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function reorderBrandAsset(
+  id: string,
+  direction: "up" | "down",
+): Promise<void> {
+  const supabase = await createClient();
+  const { data: target, error: targetError } = await supabase
+    .from("brand_assets")
+    .select("brand_profile_id, asset_type, sort_order")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (targetError) throw targetError;
+  if (!target) return;
+
+  const { data: siblings, error: siblingsError } = await supabase
+    .from("brand_assets")
+    .select("id, sort_order")
+    .eq("brand_profile_id", target.brand_profile_id)
+    .eq("asset_type", target.asset_type)
+    .order("sort_order", { ascending: true });
+
+  if (siblingsError) throw siblingsError;
+
+  const index = siblings.findIndex((row) => row.id === id);
+  const neighborIndex = direction === "up" ? index - 1 : index + 1;
+  const neighbor = siblings[neighborIndex];
+  if (!neighbor) return;
+
+  const { error: updateTargetError } = await supabase
+    .from("brand_assets")
+    .update({ sort_order: neighbor.sort_order })
+    .eq("id", id);
+  if (updateTargetError) throw updateTargetError;
+
+  const { error: updateNeighborError } = await supabase
+    .from("brand_assets")
+    .update({ sort_order: target.sort_order })
+    .eq("id", neighbor.id);
+  if (updateNeighborError) throw updateNeighborError;
+}
+
+// Prefers the new brand_assets primary logo; falls back to the legacy
+// brand_profiles.logo_image_url column for brands that haven't migrated yet
+// (or whose backfill somehow didn't run) — see the create_brand_assets
+// migration's backfill for the normal path.
+export async function getPrimaryLogoUrl(): Promise<string | null> {
+  const supabase = await createClient();
+  const { data: asset, error: assetError } = await supabase
+    .from("brand_assets")
+    .select("image_url")
+    .eq("asset_type", "logo")
+    .eq("is_primary", true)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (assetError) throw assetError;
+  if (asset) return asset.image_url;
+
+  const { data: profile, error: profileError } = await supabase
+    .from("brand_profiles")
+    .select("logo_image_url")
+    .maybeSingle();
+
+  if (profileError) throw profileError;
+  return profile?.logo_image_url ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Approved promotional messages
+// ---------------------------------------------------------------------------
+
+const APPROVED_MESSAGE_SELECT =
+  "id, message, is_active, sort_order, category, usage_notes, region, campaign";
+
+export async function listApprovedMessages(): Promise<ApprovedMessageRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("approved_promotional_messages")
+    .select(APPROVED_MESSAGE_SELECT)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return data as ApprovedMessageRow[];
+}
+
+export async function listEnabledApprovedMessages(): Promise<
+  ApprovedMessageRow[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("approved_promotional_messages")
+    .select(APPROVED_MESSAGE_SELECT)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return data as ApprovedMessageRow[];
+}
+
+export async function createApprovedMessage(input: {
+  message: string;
+  isActive: boolean;
+  category?: string;
+  usageNotes?: string;
+  region?: string;
+  campaign?: string;
+}): Promise<void> {
+  const brandProfileId = await getBrandProfileId();
+  if (!brandProfileId) throw new Error("Brand profile not found.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("approved_promotional_messages")
+    .insert({
+      brand_profile_id: brandProfileId,
+      message: input.message,
+      is_active: input.isActive,
+      category: input.category ?? null,
+      usage_notes: input.usageNotes ?? null,
+      region: input.region ?? null,
+      campaign: input.campaign ?? null,
+    });
+
+  if (error) throw error;
+}
+
+export async function updateApprovedMessage(
+  id: string,
+  input: {
+    message?: string;
+    isActive?: boolean;
+    category?: string;
+    usageNotes?: string;
+    region?: string;
+    campaign?: string;
+  },
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("approved_promotional_messages")
+    .update({
+      ...(input.message !== undefined && { message: input.message }),
+      ...(input.isActive !== undefined && { is_active: input.isActive }),
+      ...(input.category !== undefined && { category: input.category }),
+      ...(input.usageNotes !== undefined && { usage_notes: input.usageNotes }),
+      ...(input.region !== undefined && { region: input.region }),
+      ...(input.campaign !== undefined && { campaign: input.campaign }),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function deleteApprovedMessage(id: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("approved_promotional_messages")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function reorderApprovedMessage(
+  id: string,
+  direction: "up" | "down",
+): Promise<void> {
+  const supabase = await createClient();
+  const { data: target, error: targetError } = await supabase
+    .from("approved_promotional_messages")
+    .select("brand_profile_id, sort_order")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (targetError) throw targetError;
+  if (!target) return;
+
+  const { data: siblings, error: siblingsError } = await supabase
+    .from("approved_promotional_messages")
+    .select("id, sort_order")
+    .eq("brand_profile_id", target.brand_profile_id)
+    .order("sort_order", { ascending: true });
+
+  if (siblingsError) throw siblingsError;
+
+  const index = siblings.findIndex((row) => row.id === id);
+  const neighborIndex = direction === "up" ? index - 1 : index + 1;
+  const neighbor = siblings[neighborIndex];
+  if (!neighbor) return;
+
+  const { error: updateTargetError } = await supabase
+    .from("approved_promotional_messages")
+    .update({ sort_order: neighbor.sort_order })
+    .eq("id", id);
+  if (updateTargetError) throw updateTargetError;
+
+  const { error: updateNeighborError } = await supabase
+    .from("approved_promotional_messages")
+    .update({ sort_order: target.sort_order })
+    .eq("id", neighbor.id);
+  if (updateNeighborError) throw updateNeighborError;
+}
+
+// ---------------------------------------------------------------------------
+// Creative generations (one row per attempt)
+// ---------------------------------------------------------------------------
+
+export async function insertGenerationAttempt(input: {
+  conceptId: string;
+  attemptNumber: number;
+  status: string;
+  imagePath?: string;
+  selectedReferenceRoles: string[];
+  qaScores?: Record<string, number>;
+  qaPassed?: boolean;
+  qaNotes?: string;
+  retryReason?: string;
+  failureReason?: string;
+}): Promise<string> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("creative_generations")
+    .insert({
+      concept_id: input.conceptId,
+      attempt_number: input.attemptNumber,
+      status: input.status,
+      image_path: input.imagePath ?? null,
+      selected_reference_roles: input.selectedReferenceRoles,
+      qa_scores: input.qaScores ?? null,
+      qa_passed: input.qaPassed ?? null,
+      qa_notes: input.qaNotes ?? null,
+      retry_reason: input.retryReason ?? null,
+      failure_reason: input.failureReason ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data.id;
+}
+
+export async function updateGenerationAttempt(
+  id: string,
+  input: {
+    status?: string;
+    imagePath?: string;
+    qaScores?: Record<string, number>;
+    qaPassed?: boolean;
+    qaNotes?: string;
+    failureReason?: string;
+  },
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("creative_generations")
+    .update({
+      ...(input.status !== undefined && { status: input.status }),
+      ...(input.imagePath !== undefined && { image_path: input.imagePath }),
+      ...(input.qaScores !== undefined && { qa_scores: input.qaScores }),
+      ...(input.qaPassed !== undefined && { qa_passed: input.qaPassed }),
+      ...(input.qaNotes !== undefined && { qa_notes: input.qaNotes }),
+      ...(input.failureReason !== undefined && {
+        failure_reason: input.failureReason,
+      }),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function listGenerationsForConcept(
+  conceptId: string,
+): Promise<CreativeGenerationRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("creative_generations")
+    .select(
+      "id, concept_id, attempt_number, status, image_path, selected_reference_roles, qa_scores, qa_passed, qa_notes, retry_reason, failure_reason, created_at",
+    )
+    .eq("concept_id", conceptId)
+    .order("attempt_number", { ascending: true });
+
+  if (error) throw error;
+  return data as unknown as CreativeGenerationRow[];
+}
+
+export async function updateConceptGenerationStatus(
+  conceptId: string,
+  status: string,
+  retryCount: number,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ad_concepts")
+    .update({
+      generation_status: status,
+      generation_retry_count: retryCount,
+    })
+    .eq("id", conceptId);
 
   if (error) throw error;
 }

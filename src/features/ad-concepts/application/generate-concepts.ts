@@ -7,6 +7,7 @@ import {
   getBrandProfile,
   getInspirationAd,
   insertConcepts,
+  listEnabledApprovedMessages,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import type { ActionState } from "@/features/ad-concepts/application/types";
@@ -37,9 +38,12 @@ export async function generateConceptsAction(
     };
   }
 
-  const inspirationAd = parsed.data.inspirationAdId
-    ? await getInspirationAd(parsed.data.inspirationAdId)
-    : null;
+  const [inspirationAd, enabledMessages] = await Promise.all([
+    parsed.data.inspirationAdId
+      ? getInspirationAd(parsed.data.inspirationAdId)
+      : null,
+    listEnabledApprovedMessages(),
+  ]);
 
   try {
     const output = await generateConcepts(
@@ -50,7 +54,16 @@ export async function generateConceptsAction(
         targetAudience: brandProfile.target_audience,
         uniqueSellingPoints: brandProfile.unique_selling_points,
       },
+      {
+        brandColors: brandProfile.brand_colors,
+        typographyNotes: brandProfile.typography_notes,
+        embossStyle: brandProfile.emboss_style,
+        embossCustomNotes: brandProfile.emboss_custom_notes,
+        foilStyle: brandProfile.foil_style,
+        foilCustomNotes: brandProfile.foil_custom_notes,
+      },
       parsed.data.brief,
+      enabledMessages.map((m) => m.message),
       inspirationAd
         ? {
             competitorName: inspirationAd.competitorName,

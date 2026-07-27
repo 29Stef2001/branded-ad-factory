@@ -11,6 +11,14 @@ export async function saveBrandProfileAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const brandColors = {
+    primary: formData.get("brandColorsPrimary") || undefined,
+    secondary: formData.get("brandColorsSecondary") || undefined,
+    accent: formData.get("brandColorsAccent") || undefined,
+    background: formData.get("brandColorsBackground") || undefined,
+  };
+  const hasBrandColors = Object.values(brandColors).some(Boolean);
+
   const parsed = brandProfileSchema.safeParse({
     brandName: formData.get("brandName"),
     industry: formData.get("industry"),
@@ -18,6 +26,12 @@ export async function saveBrandProfileAction(
     targetAudience: formData.get("targetAudience"),
     uniqueSellingPoints: formData.get("uniqueSellingPoints"),
     logoImageUrl: formData.get("logoImageUrl") || undefined,
+    brandColors: hasBrandColors ? brandColors : undefined,
+    typographyNotes: formData.get("typographyNotes") || undefined,
+    embossStyle: formData.get("embossStyle") || undefined,
+    embossCustomNotes: formData.get("embossCustomNotes") || undefined,
+    foilStyle: formData.get("foilStyle") || undefined,
+    foilCustomNotes: formData.get("foilCustomNotes") || undefined,
   });
 
   if (!parsed.success) {

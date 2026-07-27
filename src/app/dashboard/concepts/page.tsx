@@ -9,10 +9,14 @@ import {
 import { BrandProfileForm } from "@/features/ad-concepts/ui/brand-profile-form";
 import { GenerateConceptsForm } from "@/features/ad-concepts/ui/generate-concepts-form";
 import { ConceptCard } from "@/features/ad-concepts/ui/concept-card";
+import { BrandAssetsManager } from "@/features/ad-concepts/ui/brand-assets-manager";
+import { ApprovedMessagesManager } from "@/features/ad-concepts/ui/approved-messages-manager";
 import {
   getBrandProfile,
   getSignedImageUrls,
   listAnalyzedAdsForInspiration,
+  listApprovedMessages,
+  listBrandAssets,
   listConcepts,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
@@ -28,10 +32,18 @@ export const metadata: Metadata = {
 export const maxDuration = 300;
 
 export default async function ConceptsPage() {
-  const [brandProfile, inspirationOptions, concepts] = await Promise.all([
+  const [
+    brandProfile,
+    inspirationOptions,
+    concepts,
+    brandAssets,
+    approvedMessages,
+  ] = await Promise.all([
     getBrandProfile(),
     listAnalyzedAdsForInspiration(),
     listConcepts(),
+    listBrandAssets(),
+    listApprovedMessages(),
   ]);
 
   const imagePaths = concepts
@@ -75,6 +87,13 @@ export default async function ConceptsPage() {
                 <GenerateConceptsForm inspirationOptions={inspirationOptions} />
               </CardContent>
             </Card>
+          )}
+
+          {brandProfile && (
+            <>
+              <BrandAssetsManager assets={brandAssets} />
+              <ApprovedMessagesManager messages={approvedMessages} />
+            </>
           )}
         </div>
 
