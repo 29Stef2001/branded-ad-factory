@@ -26,6 +26,12 @@ export default function DashboardLayout({
           >
             Concepts
           </Link>
+          <Link
+            href="/dashboard/agents"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Agents
+          </Link>
         </div>
         <LogoutButton />
       </header>

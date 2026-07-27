@@ -14,5 +14,8 @@ default mutation pattern (see `ARCHITECTURE.md`); `src/app/api/**` route handler
 needing an external HTTP contract (webhooks, non-Next consumers).
 
 `auth` (email/password authentication, session management), `competitor-analysis` (Meta Ad Library
-ingestion + Claude-generated ad analysis), and `ad-concepts` (brand profile + Claude-generated ad concepts)
-are built on this convention — see any of them for a concrete example of the layering in practice.
+ingestion + Claude-generated ad analysis), `ad-concepts` (brand profile + Claude-generated ad concepts), and
+`agents-overview` (read-only dashboard summarizing the other features) are built on this convention — see
+any of them for a concrete example of the layering in practice. Not every feature needs every layer: a
+read-only feature like `agents-overview` has only `infrastructure/` and `ui/` since there's nothing to
+validate or mutate.

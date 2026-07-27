@@ -113,6 +113,23 @@ informed by a competitor ad already analyzed by `competitor-analysis`:
   generation. Both `brand_profiles` and `ad_concepts` are owned directly by `user_id` (RLS), unlike
   `competitor_ads`' indirect ownership through `competitors`.
 
+## Agents overview
+
+`src/features/agents-overview` is a read-only dashboard (`/dashboard/agents`) summarizing the other
+AI-powered features as status cards — no new tables, no new secrets, no mutations:
+
+- **Only `infrastructure/` and `ui/` layers exist** — there's no user input to validate (`domain/`) and no
+  Server Actions (`application/`), since this feature only reads.
+- **Status is derived, not tracked**: a card shows "Active" when its underlying run count is greater than
+  0, "Idle" otherwise — a real signal from existing data, not a separately maintained flag.
+- **No success-rate metric yet, deliberately**: nothing in the app persists failed runs today (Server
+  Actions surface an error to the UI but don't write a failure record anywhere), so a genuine success
+  percentage isn't computable. `AgentCard` accepts an optional `successRate` prop that simply isn't passed
+  yet, rather than showing a fabricated number.
+- Counts come from `count(*)` queries directly against `ad_analyses` and `ad_concepts` (same
+  database-level cross-feature read pattern as `ad-concepts`'s inspiration picker) — both already RLS-scoped
+  to the current user, so no extra filtering is needed here.
+
 ## Follow-ups (deliberately not done during scaffolding)
 
 - **`src/types/supabase.ts`** — generate once a real Supabase project is linked:

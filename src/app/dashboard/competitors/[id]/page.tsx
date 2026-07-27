@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdCard } from "@/features/competitor-analysis/ui/ad-card";
+import { RefreshAdsButton } from "@/features/competitor-analysis/ui/refresh-ads-button";
 import {
   getCompetitor,
   listAdsWithAnalysis,
@@ -27,19 +28,22 @@ export default async function CompetitorDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link
-          href="/dashboard/competitors"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          &larr; Competitors
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {competitor.name}
-        </h1>
-        <p className="text-muted-foreground">
-          Meta Page ID: {competitor.meta_page_id}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link
+            href="/dashboard/competitors"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            &larr; Competitors
+          </Link>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {competitor.name}
+          </h1>
+          <p className="text-muted-foreground">
+            Meta Page ID: {competitor.meta_page_id}
+          </p>
+        </div>
+        <RefreshAdsButton competitorId={competitor.id} />
       </div>
 
       {ads.length === 0 ? (
