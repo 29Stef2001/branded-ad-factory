@@ -129,6 +129,27 @@ AI-powered features as status cards — no new tables, no new secrets, no mutati
 - Counts come from `count(*)` queries directly against `ad_analyses` and `ad_concepts` (same
   database-level cross-feature read pattern as `ad-concepts`'s inspiration picker) — both already RLS-scoped
   to the current user, so no extra filtering is needed here.
+- `AgentCard` also supports a `comingSoon` state (muted card, "Coming soon" badge, no run count) for agents
+  that are on the roadmap but not built yet — currently Campaign Manager and Ad Performance Tracker, both
+  blocked on `ads_management`-level Meta permissions.
+
+## Concept refinement
+
+Concept Refiner (`refine-concept.ts` / `refine-concept-form.tsx` / `RefineConcept*`, part of the
+`ad-concepts` feature rather than a separate one) lets a user iterate on an existing generated concept with
+a short instruction, producing a new concept rather than editing in place:
+
+- `ad_concepts.refined_from_concept_id` is a **nullable, self-referential foreign key** (`on delete set
+null`) — a refinement is a new row pointing back at the concept it came from, so the original is never
+  lost and both remain comparable in the history list.
+- The refinement instruction is stored in the existing `brief` column — that column has always meant "the
+  prompt that produced this row", which applies equally to a full generation brief or a one-line refinement
+  instruction.
+- Uses the same `client.messages.parse()` + `zodOutputFormat(conceptSchema)` pattern as generation, but at
+  `effort: "medium"` rather than `"high"` — refining one concept against a specific instruction is a more
+  constrained edit than generating 3 concepts from scratch.
+- `/dashboard/agents`'s "Concept Generator" and "Concept Refiner" cards are counted as mutually exclusive
+  (`refined_from_concept_id is null` vs. `is not null`) so the two numbers sum to the true total.
 
 ## Follow-ups (deliberately not done during scaffolding)
 

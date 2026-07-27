@@ -3,6 +3,7 @@ import { AgentCard } from "@/features/agents-overview/ui/agent-card";
 import {
   countAdAnalyses,
   countAdConcepts,
+  countRefinedConcepts,
 } from "@/features/agents-overview/infrastructure/agents-repository";
 
 export const metadata: Metadata = {
@@ -10,9 +11,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AgentsPage() {
-  const [analysesCount, conceptsCount] = await Promise.all([
+  const [analysesCount, conceptsCount, refinedCount] = await Promise.all([
     countAdAnalyses(),
     countAdConcepts(),
+    countRefinedConcepts(),
   ]);
 
   return (
@@ -34,6 +36,11 @@ export default async function AgentsPage() {
           name="Concept Generator"
           description="Generates on-brand ad concepts from a campaign brief."
           runs={conceptsCount}
+        />
+        <AgentCard
+          name="Concept Refiner"
+          description="Iterates on existing ad concepts based on your feedback."
+          runs={refinedCount}
         />
         <AgentCard
           name="Campaign Manager"

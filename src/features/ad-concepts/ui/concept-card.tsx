@@ -5,10 +5,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RefineConceptForm } from "@/features/ad-concepts/ui/refine-concept-form";
 import type { ConceptRow } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 export function ConceptCard({ concept }: { concept: ConceptRow }) {
   const inspiredByName = concept.competitor_ads?.competitors?.name;
+  const refinedFromHeadline = concept.original?.headline;
 
   return (
     <Card>
@@ -16,7 +18,7 @@ export function ConceptCard({ concept }: { concept: ConceptRow }) {
         <CardTitle>{concept.headline}</CardTitle>
         <CardDescription>{concept.hook}</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2 text-sm">
+      <CardContent className="flex flex-col gap-3 text-sm">
         <p>{concept.body_copy}</p>
         <p className="text-muted-foreground">
           <span className="font-medium text-foreground">Visual direction:</span>{" "}
@@ -31,6 +33,12 @@ export function ConceptCard({ concept }: { concept: ConceptRow }) {
             Inspired by: {inspiredByName}
           </p>
         )}
+        {refinedFromHeadline && (
+          <p className="text-xs text-muted-foreground">
+            Refined from: {refinedFromHeadline}
+          </p>
+        )}
+        <RefineConceptForm conceptId={concept.id} />
       </CardContent>
     </Card>
   );

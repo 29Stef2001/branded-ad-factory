@@ -13,7 +13,7 @@ export const generateConceptsSchema = z.object({
   inspirationAdId: z.string().optional(),
 });
 
-const conceptSchema = z.object({
+export const conceptSchema = z.object({
   headline: z.string().describe("A short, punchy ad headline"),
   hook: z.string().describe("The opening line or visual hook"),
   bodyCopy: z.string().describe("The main ad body copy"),
@@ -25,6 +25,10 @@ const conceptSchema = z.object({
 
 export const conceptsOutputSchema = z.object({
   concepts: z.array(conceptSchema).length(3),
+});
+
+export const refineConceptSchema = z.object({
+  instruction: z.string().min(3, "Describe what you'd like to change"),
 });
 
 export type Concept = z.infer<typeof conceptSchema>;

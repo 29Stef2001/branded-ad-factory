@@ -25,6 +25,7 @@ export type ConceptRow = {
   call_to_action: string;
   created_at: string;
   competitor_ads: { competitors: { name: string } | null } | null;
+  original: { headline: string } | null;
 };
 
 export async function getBrandProfile(): Promise<BrandProfile | null> {
@@ -153,10 +154,59 @@ export async function listConcepts(): Promise<ConceptRow[]> {
   const { data, error } = await supabase
     .from("ad_concepts")
     .select(
-      "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, competitor_ads(competitors(name))",
+      "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline)",
     )
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return data as unknown as ConceptRow[];
+}
+
+export type ConceptFields = {
+  headline: string;
+  hook: string;
+  bodyCopy: string;
+  visualDirection: string;
+  callToAction: string;
+};
+
+export async function getConcept(id: string): Promise<ConceptFields | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ad_concepts")
+    .select("headline, hook, body_copy, visual_direction, call_to_action")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    headline: data.headline,
+    hook: data.hook,
+    bodyCopy: data.body_copy,
+    visualDirection: data.visual_direction,
+    callToAction: data.call_to_action,
+  };
+}
+
+export async function insertRefinedConcept(
+  userId: string,
+  originalConceptId: string,
+  instruction: string,
+  concept: Concept,
+) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("ad_concepts").insert({
+    user_id: userId,
+    brief: instruction,
+    refined_from_concept_id: originalConceptId,
+    headline: concept.headline,
+    hook: concept.hook,
+    body_copy: concept.bodyCopy,
+    visual_direction: concept.visualDirection,
+    call_to_action: concept.callToAction,
+  });
+
+  if (error) throw error;
 }
