@@ -127,9 +127,7 @@ export const NAV_TREE: NavEntry[] = [
       {
         label: "Prompt Builder",
         segment: "creative-studio/prompt-builder",
-        status: "soon",
-        blurb:
-          "Compose and save the prompt structures that drive image generation.",
+        status: "live",
       },
       {
         label: "Image QA",

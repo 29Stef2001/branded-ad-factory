@@ -23,25 +23,32 @@ export const MAX_REFERENCE_IMAGES = 3;
 
 export type ReferenceRole = "product" | "logo" | BrandAssetType;
 
-export type SelectedReference = {
+// Generic over the candidate shape so callers get their own richer type back
+// — the Prompt Builder passes assets carrying resolved display URLs and needs
+// those URLs on the way out, not the narrowed structural minimum.
+export type SelectedReference<
+  T extends BrandAssetCandidate = BrandAssetCandidate,
+> = {
   role: ReferenceRole;
   // null for "product"/"logo" — those are resolved from product_image_url /
-  // getPrimaryLogoUrl() by the caller, not from the brand_assets list this
-  // function ranks contextual candidates from.
-  asset: BrandAssetCandidate | null;
+  // the brand asset library by the caller, not from the contextual candidates
+  // this function ranks.
+  asset: T | null;
 };
 
-export type AssetSelectionResult = {
-  selected: SelectedReference[];
+export type AssetSelectionResult<
+  T extends BrandAssetCandidate = BrandAssetCandidate,
+> = {
+  selected: SelectedReference<T>[];
   // Requirements that didn't fit within MAX_REFERENCE_IMAGES get folded into
   // a short text note (using the asset's label) instead of an attached image.
   overflowNotes: string[];
 };
 
-function pickBestAsset(
+function pickBestAsset<T extends BrandAssetCandidate>(
   type: BrandAssetType,
-  availableAssets: BrandAssetCandidate[],
-): BrandAssetCandidate | null {
+  availableAssets: T[],
+): T | null {
   const matches = availableAssets.filter(
     (asset) => asset.asset_type === type && asset.is_active,
   );
@@ -49,13 +56,13 @@ function pickBestAsset(
   return matches.find((asset) => asset.is_primary) ?? matches[0];
 }
 
-export function selectReferenceAssets(
+export function selectReferenceAssets<T extends BrandAssetCandidate>(
   requirements: BrandAssetType[],
-  availableAssets: BrandAssetCandidate[],
+  availableAssets: T[],
   hasProduct: boolean,
   hasLogo: boolean,
-): AssetSelectionResult {
-  const selected: SelectedReference[] = [];
+): AssetSelectionResult<T> {
+  const selected: SelectedReference<T>[] = [];
 
   if (hasProduct) selected.push({ role: "product", asset: null });
   if (hasLogo) selected.push({ role: "logo", asset: null });

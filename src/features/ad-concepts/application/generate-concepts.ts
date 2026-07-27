@@ -9,6 +9,7 @@ import {
   insertConcepts,
   listEnabledApprovedMessages,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import { toUserFacingError } from "@/features/ad-concepts/domain/generation-errors";
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import type { ActionState } from "@/features/ad-concepts/application/types";
 
@@ -80,11 +81,10 @@ export async function generateConceptsAction(
       output.concepts,
     );
   } catch (error) {
-    return {
-      status: "error",
-      message:
-        error instanceof Error ? error.message : "Concept generation failed.",
-    };
+    // Provider errors arrive as raw JSON payloads; surfacing those verbatim
+    // told the user nothing about whether to wait or change something.
+    console.error("Concept generation failed", { error });
+    return { status: "error", message: toUserFacingError(error).message };
   }
 
   revalidatePath("/dashboard/concepts");

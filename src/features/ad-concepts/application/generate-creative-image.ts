@@ -7,6 +7,7 @@ import {
   type BrandAssetType,
 } from "@/features/ad-concepts/domain/schemas";
 import { selectReferenceAssets } from "@/features/ad-concepts/domain/asset-selection";
+import { toUserFacingError } from "@/features/ad-concepts/domain/generation-errors";
 import {
   fetchExternalImage,
   generateConceptImage,
@@ -31,6 +32,7 @@ import { requireUserId } from "@/features/ad-concepts/application/require-user";
 import type { ActionState } from "@/features/ad-concepts/application/types";
 
 const CONCEPTS_PATH = "/dashboard/concepts";
+const PROMPT_BUILDER_PATH = "/dashboard/creative-studio/prompt-builder";
 
 /**
  * Loads the bytes for one selected reference, from wherever that asset lives.
@@ -209,20 +211,23 @@ export async function generateCreativeImageAction(
       attemptNumber - 1,
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Image generation failed.";
+    // The raw error goes to the logs and to the attempt row; the user gets a
+    // translation. Provider payloads are not readable and leak internals.
+    console.error("Image generation failed", { conceptId, attemptId, error });
 
-    // Recorded before returning: a failed generation that leaves no trace is
-    // indistinguishable from one that never ran.
+    const technical = error instanceof Error ? error.message : String(error);
+    const friendly = toUserFacingError(error);
+
     await updateGenerationAttempt(attemptId, {
       status: "failed",
-      failureReason: message,
+      failureReason: technical,
     });
     await updateConceptGenerationStatus(conceptId, "failed", attemptNumber - 1);
 
-    return { status: "error", message };
+    return { status: "error", message: friendly.message };
   }
 
   revalidatePath(CONCEPTS_PATH);
+  revalidatePath(PROMPT_BUILDER_PATH);
   return { status: "success" };
 }

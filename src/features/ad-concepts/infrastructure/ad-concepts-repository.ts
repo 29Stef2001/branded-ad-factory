@@ -375,7 +375,7 @@ export async function getConceptForGeneration(
   const { data, error } = await supabase
     .from("ad_concepts")
     .select(
-      "final_generation_prompt, visual_direction, brand_asset_requirements, structured_concept, promotional_message:approved_promotional_messages(message)",
+      "generation_prompt_override, final_generation_prompt, visual_direction, brand_asset_requirements, structured_concept, promotional_message:approved_promotional_messages(message)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -392,8 +392,12 @@ export async function getConceptForGeneration(
   } | null;
 
   return {
+    // A hand-edited prompt wins over the generated one, which in turn wins over
+    // visual_direction for concepts created before structured output existed.
     finalGenerationPrompt:
-      data.final_generation_prompt ?? data.visual_direction,
+      data.generation_prompt_override ??
+      data.final_generation_prompt ??
+      data.visual_direction,
     brandAssetRequirements: data.brand_asset_requirements ?? [],
     promotionalMessage: promotionalMessage?.message ?? null,
     messagePlacement: structured?.messagePlacement ?? null,
@@ -997,6 +1001,72 @@ export async function updateGenerationAttempt(
  * count so far plus one. `head: true` keeps this a count query rather than
  * pulling every previous attempt back just to measure the list.
  */
+export type ConceptSummary = {
+  id: string;
+  headline: string;
+  strategy_type: string | null;
+  generation_status: string | null;
+  created_at: string;
+};
+
+/** Just enough to populate the Prompt Builder's concept picker. */
+export async function listConceptSummaries(): Promise<ConceptSummary[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ad_concepts")
+    .select("id, headline, strategy_type, generation_status, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data as ConceptSummary[];
+}
+
+export type ConceptPromptDetail = {
+  id: string;
+  headline: string;
+  strategy_type: string | null;
+  campaign_angle: string | null;
+  visual_direction: string;
+  final_generation_prompt: string | null;
+  generation_prompt_override: string | null;
+  structured_concept: Record<string, unknown> | null;
+  brand_asset_requirements: string[];
+  promotional_message_id: string | null;
+  promotional_message: { message: string } | null;
+  generation_status: string | null;
+  creative_image_path: string | null;
+};
+
+export async function getConceptPromptDetail(
+  id: string,
+): Promise<ConceptPromptDetail | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ad_concepts")
+    .select(
+      "id, headline, strategy_type, campaign_angle, visual_direction, final_generation_prompt, generation_prompt_override, structured_concept, brand_asset_requirements, promotional_message_id, generation_status, creative_image_path, promotional_message:approved_promotional_messages(message)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as unknown as ConceptPromptDetail | null;
+}
+
+/** Passing null clears the edit, restoring the model's original prompt. */
+export async function setGenerationPromptOverride(
+  conceptId: string,
+  prompt: string | null,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ad_concepts")
+    .update({ generation_prompt_override: prompt })
+    .eq("id", conceptId);
+
+  if (error) throw error;
+}
+
 export async function countGenerationAttempts(
   conceptId: string,
 ): Promise<number> {
