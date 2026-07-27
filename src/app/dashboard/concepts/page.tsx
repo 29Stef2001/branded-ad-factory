@@ -21,7 +21,11 @@ export const metadata: Metadata = {
 };
 
 // Image generation can take up to ~2 minutes for complex prompts (OpenAI docs).
-export const maxDuration = 60;
+// 60 was too low to be safe: a measured run with a logo reference image took
+// 74s end-to-end, so a serverless deploy would have killed it mid-generation
+// and surfaced a timeout instead of an image. Note this ceiling still can't
+// exceed the hosting plan's own limit (60s on Vercel Hobby).
+export const maxDuration = 300;
 
 export default async function ConceptsPage() {
   const [brandProfile, inspirationOptions, concepts] = await Promise.all([
