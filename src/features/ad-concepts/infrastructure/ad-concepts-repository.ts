@@ -7,6 +7,7 @@ export type BrandProfile = {
   tone: string;
   target_audience: string;
   unique_selling_points: string;
+  logo_image_url: string | null;
 };
 
 export type InspirationOption = {
@@ -24,16 +25,20 @@ export type ConceptRow = {
   visual_direction: string;
   call_to_action: string;
   created_at: string;
+  creative_image_path: string | null;
+  product_image_url: string | null;
   competitor_ads: { competitors: { name: string } | null } | null;
   original: { headline: string } | null;
 };
+
+const CREATIVE_IMAGES_BUCKET = "ad-creative-images";
 
 export async function getBrandProfile(): Promise<BrandProfile | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("brand_profiles")
     .select(
-      "brand_name, industry, tone, target_audience, unique_selling_points",
+      "brand_name, industry, tone, target_audience, unique_selling_points, logo_image_url",
     )
     .maybeSingle();
 
@@ -49,6 +54,7 @@ export async function upsertBrandProfile(
     tone: string;
     targetAudience: string;
     uniqueSellingPoints: string;
+    logoImageUrl?: string;
   },
 ) {
   const supabase = await createClient();
@@ -60,6 +66,7 @@ export async function upsertBrandProfile(
       tone: profile.tone,
       target_audience: profile.targetAudience,
       unique_selling_points: profile.uniqueSellingPoints,
+      logo_image_url: profile.logoImageUrl ?? null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
@@ -154,12 +161,31 @@ export async function listConcepts(): Promise<ConceptRow[]> {
   const { data, error } = await supabase
     .from("ad_concepts")
     .select(
-      "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline)",
+      "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, creative_image_path, product_image_url, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline)",
     )
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return data as unknown as ConceptRow[];
+}
+
+export async function getSignedImageUrls(
+  paths: string[],
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from(CREATIVE_IMAGES_BUCKET)
+    .createSignedUrls(paths, 3600);
+
+  if (error) throw error;
+
+  const urls = new Map<string, string>();
+  for (const entry of data) {
+    if (entry.path && entry.signedUrl) urls.set(entry.path, entry.signedUrl);
+  }
+  return urls;
 }
 
 export type ConceptFields = {
@@ -188,6 +214,44 @@ export async function getConcept(id: string): Promise<ConceptFields | null> {
     visualDirection: data.visual_direction,
     callToAction: data.call_to_action,
   };
+}
+
+export async function uploadConceptImage(
+  path: string,
+  image: Buffer,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.storage
+    .from(CREATIVE_IMAGES_BUCKET)
+    .upload(path, image, { contentType: "image/png", upsert: true });
+
+  if (error) throw error;
+}
+
+export async function setConceptImagePath(
+  id: string,
+  path: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ad_concepts")
+    .update({ creative_image_path: path })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function setConceptProductImageUrl(
+  id: string,
+  url: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ad_concepts")
+    .update({ product_image_url: url })
+    .eq("id", id);
+
+  if (error) throw error;
 }
 
 export async function insertRefinedConcept(

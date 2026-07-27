@@ -109,9 +109,10 @@ informed by a competitor ad already analyzed by `competitor-analysis`:
 - **Cross-feature reads happen at the database, not the code level**: `ad-concepts`' own repository
   queries `competitor_ads` / `ad_analyses` / `competitors` directly for the inspiration list, rather than
   importing `competitor-analysis`'s repository functions — keeps the two features loosely coupled.
-- Text/creative-direction only (headline, hook, body copy, written visual direction, CTA) — no image
-  generation. Both `brand_profiles` and `ad_concepts` are owned directly by `user_id` (RLS), unlike
-  `competitor_ads`' indirect ownership through `competitors`.
+- Text/creative-direction only (headline, hook, body copy, written visual direction, CTA) at generation
+  time — see "Creative image generation" below for the follow-on feature that turns `visual_direction`
+  into an actual image. Both `brand_profiles` and `ad_concepts` are owned directly by `user_id` (RLS),
+  unlike `competitor_ads`' indirect ownership through `competitors`.
 
 ## Agents overview
 
@@ -186,6 +187,104 @@ party:
   encryption — not separately encrypted at the column level. Acceptable for a v1 with `ads_read`-scoped
   tokens (read-only, can't spend money or modify campaigns), but worth revisiting with something like
   Supabase Vault before this handles many real users' tokens.
+
+## Creative image generation
+
+Creative Generator (`image-generation-client.ts` / `generate-creative-image.ts` /
+`GenerateCreativeImageForm`, part of `ad-concepts` rather than a separate feature — same precedent as
+Concept Refiner) turns a concept's `visual_direction` text into an actual AI-generated image, on demand:
+
+- **Claude cannot generate images** — it's text/vision-in, text-out only. This is the app's first
+  non-Anthropic AI vendor: **OpenAI**, via the `openai` npm package, chosen over Google Imagen/fal.ai/
+  Replicate/Stability because it's a plain API-key-plus-billing account, no app-review process (unlike
+  the Meta integrations above).
+- **Model is `gpt-image-2`, not `gpt-image-1`** — `gpt-image-1` shuts down 2026-10-23; `gpt-image-2`
+  (shipped April 2026) is current. Confirmed against OpenAI's live docs rather than assumed, since a
+  training-data prior here would have been stale.
+- **No `response_format` param is sent.** Verified against the installed SDK's own type definitions
+  (`node_modules/openai/resources/images.d.ts`), not just docs prose: GPT image models — unlike
+  `dall-e-2`/`dall-e-3` — don't support `response_format` at all and always return base64 in
+  `data[0].b64_json`. There is no URL-returning mode to accidentally pick, so the usual "signed/temporary
+  URL expiry" pitfall doesn't apply here.
+- `quality: "medium"` (not `"high"`) — balances output quality against latency/cost; OpenAI's docs note
+  complex prompts can take up to ~2 minutes at higher quality. `src/app/dashboard/concepts/page.tsx`
+  exports `maxDuration = 60` to give the Server Action room to finish on a serverless deploy.
+- **The prompt deliberately excludes literal text** (headline/CTA) — image models render legible text
+  unreliably, so only `visual_direction` plus brand tone/industry go into the prompt, with an explicit
+  instruction not to render text overlays.
+- **First use of Supabase Storage in this app** (bucket `ad-creative-images`), created via a plain SQL
+  migration (`insert into storage.buckets ...`) rather than a dashboard step — confirmed this is
+  Supabase's documented, supported approach. The bucket is **private**, not public, to stay consistent
+  with the rest of the app's RLS-everywhere posture; `getSignedImageUrls()` generates 1-hour signed URLs
+  server-side each time `/dashboard/concepts` renders, the same "fetch fresh per request" shape the rest
+  of the app already uses.
+- **One image per concept, not a gallery**: `ad_concepts.creative_image_path` (nullable) stores the
+  Storage object path (`{user_id}/{concept_id}.png`), and regenerating overwrites the same object
+  (`upsert: true`) instead of accumulating versions — mirrors `brand_profiles`' 1-per-user simplicity.
+- **New `ad_concepts` RLS policy**: an `update` policy scoped to `auth.uid() = user_id` was added — the
+  table previously had only `select`/`insert`, since nothing before this updated a concept row in place.
+- **`storage.objects` RLS** is scoped by path convention rather than a column: policies check
+  `auth.uid()::text = (storage.foldername(name))[1]`, i.e. the first path segment is the owning user's id.
+
+### Reference-image generation (product-accurate creative)
+
+Pure text-to-image generation invents the product from scratch — unacceptable for a brand (Copper Soul)
+selling specific, real jewelry pieces. `ad_concepts.product_image_url` (nullable) lets a concept point at
+an actual product photo; when set, image generation uses OpenAI's **edit** endpoint instead of generate,
+compositing the real product into a new scene rather than fabricating one:
+
+- **`client.images.edit()`, not `.generate()`**, whenever at least one reference image is available —
+  `generateConceptImage()` in `image-generation-client.ts` takes an optional `{ product?, logo? }`
+  references argument and switches endpoints accordingly, rather than being two near-duplicate functions.
+  `gpt-image-2` supports the edit endpoint with reference images — confirmed against OpenAI's live docs
+  after finding the installed SDK's own docstring comment listed an incomplete/stale model list for
+  `edit()` (missing `gpt-image-2`, even though the actual `model` param type and OpenAI's guide both
+  confirm support).
+- **No `input_fidelity` param** — that knob is for other GPT image models; "gpt-image-2 always processes
+  image inputs at high fidelity automatically" per OpenAI's docs, so passing it would be a no-op at best.
+- **No masking** — GPT Image's masking is prompt-guided, not pixel-precise, so a full-image edit with an
+  explicit "preserve the product exactly, only change the surroundings" instruction does the same job as
+  a mask would here, with less complexity.
+- **Not a guaranteed pixel-perfect result** — this is a general-purpose edit model, not a specialized
+  product-compositing tool. High-fidelity reference processing is the best lever OpenAI exposes, but some
+  drift in the product's exact appearance is possible; validate on real products before relying on this
+  for production creative.
+- **Reference photo via URL paste, not upload** — Copper Soul's product photos already live on a public,
+  stable Shopify CDN URL per product, so pasting that URL needs no new upload UI or storage bucket. A
+  file-upload alternative is a documented fast-follow, not built.
+- **`isAllowedExternalImageHost()` / `fetchExternalImage()` (`image-generation-client.ts`) guard against
+  SSRF**: any Server Action that fetches a user-pasted URL server-side — without a check, that's a vector
+  for making the server request arbitrary/internal hosts. `cdn.shopify.com`/`*.myshopify.com` are always
+  allowed (safe for any store); a store serving CDN/asset files on its own custom domain instead —
+  confirmed empirically against Copper Soul's real product and logo URLs, which resolve to
+  `www.copper-soul.com/cdn/shop/...`, not `cdn.shopify.com` — additionally needs its domain allowlisted via
+  the optional `SHOPIFY_STORE_HOSTNAME` env var. These helpers live in the **infrastructure** layer (they
+  need `env`, and `domain/` is meant to stay IO/config-free per this repo's layering convention,
+  `src/features/README.md`) and are shared by both the product-photo path (`generate-creative-image.ts`)
+  and the brand-logo path (`save-brand-profile.ts`) — the domain schemas only validate that the submitted
+  values are well-formed URLs.
+- **Optional, not mandatory** — `generateCreativeImageAction` falls back to the original text-only
+  generation path when no `productImageUrl` is supplied, so exploratory concepts without a chosen SKU yet
+  are unaffected.
+
+### Real brand logo compositing
+
+Instructing the model in prose to "show the brand logo" produces an invented, illegible emblem — GPT
+image models render arbitrary text unreliably. `brand_profiles.logo_image_url` (nullable, optional even
+though every other brand-profile field is required — its absence only means generated images fall back to
+an invented emblem, not degraded ad copy) lets the _real_ logo image be supplied as a second reference
+image alongside the product photo:
+
+- `generateConceptImage()` accepts up to two reference images (`product`, `logo`) and passes whichever are
+  present to `client.images.edit()` as an array — `Uploadable | Array<Uploadable>` already supports
+  multiple images, so no new OpenAI capability was needed, just a prompt that explains each reference's
+  role ("this one is the product, preserve it exactly" / "this one is the logo, reproduce it faithfully").
+- Verified end-to-end with a real product photo + Copper Soul's real logo: the result showed the logo
+  legibly embossed on the jewelry box's interior lining, a clear improvement over the invented-emblem
+  fallback — confirming reference images are dramatically more reliable than prose description for
+  anything involving exact text/branding.
+- Same SSRF allowlist (`isAllowedExternalImageHost`) applies to the logo URL as the product photo URL,
+  checked in `saveBrandProfileAction` at save time (fast feedback) rather than only at generation time.
 
 ## Follow-ups (deliberately not done during scaffolding)
 

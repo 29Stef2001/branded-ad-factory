@@ -11,6 +11,11 @@ export const env = createEnv({
     META_APP_ID: z.string().min(1),
     META_APP_SECRET: z.string().min(1),
     META_LOGIN_CONFIG_ID: z.string().min(1),
+    OPENAI_API_KEY: z.string().min(1),
+    // Optional: extends the product-photo-URL allowlist in generate-creative-image.ts
+    // beyond Shopify's own domains, for stores serving CDN assets on a custom domain
+    // (e.g. copper-soul.com/cdn/shop/... rather than cdn.shopify.com/...).
+    SHOPIFY_STORE_HOSTNAME: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
@@ -24,6 +29,8 @@ export const env = createEnv({
     META_APP_ID: process.env.META_APP_ID,
     META_APP_SECRET: process.env.META_APP_SECRET,
     META_LOGIN_CONFIG_ID: process.env.META_LOGIN_CONFIG_ID,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    SHOPIFY_STORE_HOSTNAME: process.env.SHOPIFY_STORE_HOSTNAME,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,

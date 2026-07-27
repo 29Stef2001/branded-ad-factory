@@ -114,6 +114,27 @@ export function BrandProfileForm({
         )}
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="logoImageUrl">Logo URL (optional)</Label>
+        <Input
+          id="logoImageUrl"
+          name="logoImageUrl"
+          type="url"
+          placeholder="Your logo image URL (Shopify CDN)"
+          defaultValue={profile?.logo_image_url ?? ""}
+          aria-invalid={Boolean(state.fieldErrors?.logoImageUrl)}
+        />
+        <p className="text-sm text-muted-foreground">
+          When set, generated images composite your real logo (e.g. embossed
+          inside a jewelry box) instead of inventing one.
+        </p>
+        {state.fieldErrors?.logoImageUrl && (
+          <p className="text-sm text-destructive">
+            {state.fieldErrors.logoImageUrl[0]}
+          </p>
+        )}
+      </div>
+
       <Button type="submit" disabled={isPending} className="w-full">
         {isPending ? "Saving..." : "Save brand profile"}
       </Button>
