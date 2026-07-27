@@ -68,7 +68,12 @@ export default async function PerformancePage({
           <ConnectMetaButton />
         </div>
       ) : (
-        insights && <PerformanceSummary insights={insights} />
+        insights && (
+          <PerformanceSummary
+            insights={insights}
+            adAccountId={connection.ad_account_id}
+          />
+        )
       )}
     </div>
   );

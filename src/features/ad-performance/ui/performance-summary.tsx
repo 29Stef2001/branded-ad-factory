@@ -9,15 +9,18 @@ import type { AccountInsights } from "@/features/ad-performance/infrastructure/m
 
 export function PerformanceSummary({
   insights,
+  adAccountId,
 }: {
   insights: AccountInsights;
+  adAccountId: string;
 }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Last 30 days</CardTitle>
         <CardDescription>
-          Account-level totals from your connected Meta ad account.
+          Account-level totals from your connected Meta ad account (
+          {adAccountId}).
         </CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
