@@ -167,9 +167,7 @@ export const NAV_TREE: NavEntry[] = [
       {
         label: "Launch in Meta",
         segment: "ad-factory/launch",
-        status: "soon",
-        blurb:
-          "Draft/paused Meta ad creation. No live publishing — the existing Meta connection is read-only insights today.",
+        status: "live",
       },
       {
         label: "Winning Ads",
