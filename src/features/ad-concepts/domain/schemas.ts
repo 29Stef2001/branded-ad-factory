@@ -42,6 +42,28 @@ export const brandProfileSchema = z.object({
   foilCustomNotes: z.string().trim().min(1).optional(),
 });
 
+/**
+ * Mirrors the check constraint on creative_generations.status exactly. Kept as
+ * a type rather than loose strings so an invented value fails at compile time
+ * instead of arriving as a 23514 from Postgres at runtime.
+ */
+export const generationStatusEnum = z.enum([
+  "queued",
+  "generating",
+  "generated",
+  "qa_in_progress",
+  "qa_failed",
+  "retrying",
+  "needs_review",
+  "approved",
+  "rejected",
+  "ready_for_publishing",
+  "published",
+  "failed",
+]);
+
+export type GenerationStatus = z.infer<typeof generationStatusEnum>;
+
 export const brandAssetTypeEnum = z.enum([
   "logo",
   "icon",

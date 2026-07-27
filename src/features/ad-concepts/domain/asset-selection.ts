@@ -8,7 +8,9 @@ export type BrandAssetCandidate = {
   id: string;
   asset_type: BrandAssetType;
   label: string | null;
-  image_url: string;
+  // Exactly one of these is set — an asset is either a link or an upload.
+  image_url: string | null;
+  storage_path: string | null;
   is_primary: boolean;
   is_active: boolean;
 };

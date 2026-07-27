@@ -84,7 +84,13 @@ export async function generateConcepts(
 
   const message = await client.messages.parse({
     model: "claude-opus-5",
-    max_tokens: 4096,
+    // The V2 schema asks for ~20 fields per concept across 3 concepts, several
+    // of them long prose — finalGenerationPrompt alone is a complete scene
+    // description. 4096 truncated the JSON mid-string, which surfaced as
+    // "Failed to parse structured output: Unterminated string", so generation
+    // failed outright rather than degrading. Sized with real headroom because
+    // the failure mode is total, not partial.
+    max_tokens: 16384,
     output_config: {
       format: zodOutputFormat(conceptsOutputSchemaV2),
       effort: "high",

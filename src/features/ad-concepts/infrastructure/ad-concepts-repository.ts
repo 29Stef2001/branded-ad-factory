@@ -3,6 +3,7 @@ import type {
   BrandAssetType,
   Concept,
   ConceptV2,
+  GenerationStatus,
 } from "@/features/ad-concepts/domain/schemas";
 
 export type BrandColors = {
@@ -549,6 +550,31 @@ export async function uploadBrandAssetFile(
  * whereas surfacing the error would leave the user staring at a row they
  * already deleted, wondering whether it worked.
  */
+/**
+ * Pulls an uploaded asset's bytes straight out of Storage for use as a
+ * generation reference.
+ *
+ * Deliberately not routed through fetchExternalImage and its host allowlist:
+ * that guard exists to stop the server fetching user-supplied URLs, whereas
+ * this path is a private bucket the user's own RLS policy already gates. Going
+ * out over HTTP to a signed URL would be slower and would need the Supabase
+ * host allowlisted, widening the very check that protects the paste-a-URL path.
+ */
+export async function downloadBrandAssetFile(
+  path: string,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from(BRAND_ASSETS_BUCKET)
+    .download(path);
+
+  if (error) throw error;
+  return {
+    buffer: Buffer.from(await data.arrayBuffer()),
+    contentType: data.type || "image/png",
+  };
+}
+
 export async function removeBrandAssetFile(path: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.storage
@@ -906,7 +932,7 @@ export async function reorderApprovedMessage(
 export async function insertGenerationAttempt(input: {
   conceptId: string;
   attemptNumber: number;
-  status: string;
+  status: GenerationStatus;
   imagePath?: string;
   selectedReferenceRoles: string[];
   qaScores?: Record<string, number>;
@@ -940,7 +966,7 @@ export async function insertGenerationAttempt(input: {
 export async function updateGenerationAttempt(
   id: string,
   input: {
-    status?: string;
+    status?: GenerationStatus;
     imagePath?: string;
     qaScores?: Record<string, number>;
     qaPassed?: boolean;
@@ -966,6 +992,24 @@ export async function updateGenerationAttempt(
   if (error) throw error;
 }
 
+/**
+ * Attempt numbers are per concept and sequential, so the next one is simply the
+ * count so far plus one. `head: true` keeps this a count query rather than
+ * pulling every previous attempt back just to measure the list.
+ */
+export async function countGenerationAttempts(
+  conceptId: string,
+): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("creative_generations")
+    .select("*", { count: "exact", head: true })
+    .eq("concept_id", conceptId);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function listGenerationsForConcept(
   conceptId: string,
 ): Promise<CreativeGenerationRow[]> {
@@ -984,7 +1028,7 @@ export async function listGenerationsForConcept(
 
 export async function updateConceptGenerationStatus(
   conceptId: string,
-  status: string,
+  status: GenerationStatus,
   retryCount: number,
 ): Promise<void> {
   const supabase = await createClient();
