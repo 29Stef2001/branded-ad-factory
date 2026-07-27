@@ -4,6 +4,7 @@ import {
   countAdAnalyses,
   countAdConcepts,
   countRefinedConcepts,
+  isMetaAdAccountConnected,
 } from "@/features/agents-overview/infrastructure/agents-repository";
 
 export const metadata: Metadata = {
@@ -11,11 +12,13 @@ export const metadata: Metadata = {
 };
 
 export default async function AgentsPage() {
-  const [analysesCount, conceptsCount, refinedCount] = await Promise.all([
-    countAdAnalyses(),
-    countAdConcepts(),
-    countRefinedConcepts(),
-  ]);
+  const [analysesCount, conceptsCount, refinedCount, metaConnected] =
+    await Promise.all([
+      countAdAnalyses(),
+      countAdConcepts(),
+      countRefinedConcepts(),
+      isMetaAdAccountConnected(),
+    ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -49,8 +52,8 @@ export default async function AgentsPage() {
         />
         <AgentCard
           name="Ad Performance Tracker"
-          description="Tracks how your published ads and concepts perform over time."
-          comingSoon
+          description="Tracks performance of your connected Meta ad account."
+          connected={metaConnected}
         />
       </div>
     </div>

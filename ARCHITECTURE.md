@@ -130,8 +130,13 @@ AI-powered features as status cards — no new tables, no new secrets, no mutati
   database-level cross-feature read pattern as `ad-concepts`'s inspiration picker) — both already RLS-scoped
   to the current user, so no extra filtering is needed here.
 - `AgentCard` also supports a `comingSoon` state (muted card, "Coming soon" badge, no run count) for agents
-  that are on the roadmap but not built yet — currently Campaign Manager and Ad Performance Tracker, both
-  blocked on `ads_management`-level Meta permissions.
+  that are on the roadmap but not built yet — currently just Campaign Manager, blocked on
+  `ads_management`-level Meta permissions.
+- `AgentCard` also supports a `connected` boolean prop, for agents whose natural state is "connected or
+  not" rather than a run count — used by Ad Performance Tracker (`isMetaAdAccountConnected()`, a direct
+  `count(*)` check against `meta_ad_account_connections`, same cross-feature-read-at-the-database pattern
+  as everywhere else). When passed, it replaces the runs-based status/content entirely rather than trying
+  to force a "connected" agent through the "N runs" metaphor.
 
 ## Concept refinement
 

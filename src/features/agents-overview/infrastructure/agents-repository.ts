@@ -31,3 +31,13 @@ export async function countRefinedConcepts(): Promise<number> {
   if (error) throw error;
   return count ?? 0;
 }
+
+export async function isMetaAdAccountConnected(): Promise<boolean> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("meta_ad_account_connections")
+    .select("*", { count: "exact", head: true });
+
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}

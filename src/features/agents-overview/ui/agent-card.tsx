@@ -13,6 +13,7 @@ export function AgentCard({
   runs,
   successRate,
   comingSoon = false,
+  connected,
 }: {
   name: string;
   description: string;
@@ -21,8 +22,16 @@ export function AgentCard({
   successRate?: number;
   /** Shows a "Coming soon" badge instead of a live status/run count. */
   comingSoon?: boolean;
+  /**
+   * For agents whose natural state is "connected" rather than a run count
+   * (e.g. an OAuth-linked account). When provided, this replaces the
+   * runs-based status/content entirely.
+   */
+  connected?: boolean;
 }) {
-  const isActive = !comingSoon && (runs ?? 0) > 0;
+  const usesConnectionStatus = connected !== undefined;
+  const isActive =
+    !comingSoon && (usesConnectionStatus ? connected : (runs ?? 0) > 0);
 
   return (
     <Card className={comingSoon ? "opacity-70" : undefined}>
@@ -34,12 +43,20 @@ export function AgentCard({
               comingSoon ? "outline" : isActive ? "default" : "secondary"
             }
           >
-            {comingSoon ? "Coming soon" : isActive ? "Active" : "Idle"}
+            {comingSoon
+              ? "Coming soon"
+              : usesConnectionStatus
+                ? isActive
+                  ? "Connected"
+                  : "Not connected"
+                : isActive
+                  ? "Active"
+                  : "Idle"}
           </Badge>
         </div>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      {!comingSoon && (
+      {!comingSoon && !usesConnectionStatus && (
         <CardContent className="flex items-baseline gap-4 text-sm">
           <div>
             <span className="text-2xl font-semibold tracking-tight">
