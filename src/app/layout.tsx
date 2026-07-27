@@ -24,9 +24,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // `dark` is hard-coded rather than driven by a theme provider: the design
+    // system has exactly one theme, so there is nothing to toggle or persist.
+    // `colorScheme` keeps native controls (scrollbars, form widgets) dark too.
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col" suppressHydrationWarning>

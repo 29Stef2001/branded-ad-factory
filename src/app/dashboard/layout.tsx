@@ -1,47 +1,17 @@
-import Link from "next/link";
-import { LogoutButton } from "@/features/auth/ui/logout-button";
+import { DashboardShell } from "@/components/shell/dashboard-shell";
+import { getBrandProfile } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // The sidebar labels the active product workspace with the user's real brand.
+  // `brand_profiles.user_id` is UNIQUE, so this is the only workspace that can
+  // exist today; a selector follows once the data model supports more.
+  const brandProfile = await getBrandProfile();
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b px-6 py-4">
-        <div className="flex items-center gap-6">
-          <Link
-            href="/dashboard"
-            className="text-lg font-semibold tracking-tight"
-          >
-            Branded Ad Factory
-          </Link>
-          <Link
-            href="/dashboard/competitors"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Competitors
-          </Link>
-          <Link
-            href="/dashboard/concepts"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Concepts
-          </Link>
-          <Link
-            href="/dashboard/agents"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Agents
-          </Link>
-          <Link
-            href="/dashboard/performance"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Performance
-          </Link>
-        </div>
-        <LogoutButton />
-      </header>
-      <main className="flex-1 px-6 py-8">{children}</main>
-    </div>
+    <DashboardShell brandName={brandProfile?.brand_name ?? null}>
+      {children}
+    </DashboardShell>
   );
 }
