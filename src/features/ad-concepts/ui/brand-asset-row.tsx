@@ -13,6 +13,7 @@ import {
   updateBrandAssetAction,
 } from "@/features/ad-concepts/application/manage-brand-assets";
 import { initialActionState } from "@/features/ad-concepts/application/types";
+import { formatTags } from "@/features/ad-concepts/domain/asset-tags";
 import type { BrandAssetWithUrl } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 export function BrandAssetRow({ asset }: { asset: BrandAssetWithUrl }) {
@@ -91,6 +92,18 @@ export function BrandAssetRow({ asset }: { asset: BrandAssetWithUrl }) {
             <p className="text-xs text-muted-foreground">
               {[asset.region, asset.season].filter(Boolean).join(" · ")}
             </p>
+          )}
+          {asset.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {asset.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded border border-border px-1.5 py-px text-[10px] text-muted-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -191,6 +204,12 @@ export function BrandAssetRow({ asset }: { asset: BrandAssetWithUrl }) {
             name="season"
             placeholder="Season"
             defaultValue={asset.season ?? ""}
+          />
+          <Input
+            name="tags"
+            placeholder="Tags, comma separated"
+            defaultValue={formatTags(asset.tags)}
+            className="sm:col-span-2"
           />
           <Button
             type="submit"

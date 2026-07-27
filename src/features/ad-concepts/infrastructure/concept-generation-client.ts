@@ -64,11 +64,56 @@ function formatBrandStyle(style: BrandStyleInput): string {
     : "";
 }
 
+/**
+ * Which asset types the brand actually has on file, and their labels.
+ *
+ * Passed in so the model stops guessing: it was routinely requiring packaging
+ * and thank-you cards that were never uploaded, while ignoring assets that
+ * existed. Requirements it names now correspond to something real.
+ */
+export type AvailableAssetsInput = {
+  types: string[];
+  tags: string[];
+  hasOwner: boolean;
+  hasProduct: boolean;
+};
+
+function formatAvailableAssets(available: AvailableAssetsInput): string {
+  const lines: string[] = [];
+
+  lines.push(
+    available.types.length > 0
+      ? `Brand assets on file (real reference photos that will be attached to image generation): ${available.types.join(", ")}. Only ever list brandAssetRequirements from this set — anything else is ignored because no such photo exists.`
+      : "This brand has no reference photos on file yet, so leave brandAssetRequirements empty.",
+  );
+
+  if (available.tags.length > 0) {
+    lines.push(
+      `Those photos are tagged: ${available.tags.join(", ")}. Use these to judge what the brand actually looks like — they describe real imagery on file, not aspirations.`,
+    );
+  }
+
+  if (available.hasOwner) {
+    lines.push(
+      'This brand has a real owner whose photo is on file, and she appears in its creatives. Whenever a concept features a person, that person is her — a woman, the shop\'s owner. Describe `subject` as her, never as an invented character, and never as a man. Always include "owner" in brandAssetRequirements for concepts featuring a person.',
+    );
+  }
+
+  if (available.hasProduct) {
+    lines.push(
+      'This brand has real product photography on file. Any jewellery in the scene must be an actual piece from the store, so include "product" in brandAssetRequirements whenever a product is visible — never describe an invented or generic item.',
+    );
+  }
+
+  return `\n\n${lines.join("\n\n")}`;
+}
+
 export async function generateConcepts(
   brandProfile: BrandProfileInput,
   brandStyle: BrandStyleInput,
   brief: string,
   enabledMessages: string[],
+  available: AvailableAssetsInput,
   inspiration: InspirationInput,
 ): Promise<ConceptsOutputV2> {
   const inspirationBlock = inspiration
@@ -100,11 +145,13 @@ export async function generateConcepts(
         role: "user",
         content: `You are a senior direct-response creative strategist producing realistic, high-converting ad concepts — the kind that win on Facebook and Instagram through authenticity, urgency, and documentary-style realism, not polished studio advertising.
 
+Write every field in English. This brand sells to a United States audience, so all copy, all scene descriptions, and any text that will appear inside the image must be English — regardless of the language of the campaign brief.
+
 Brand: ${brandProfile.brandName}
 Industry: ${brandProfile.industry}
 Tone of voice: ${brandProfile.tone}
 Target audience: ${brandProfile.targetAudience}
-Unique selling points: ${brandProfile.uniqueSellingPoints}${formatBrandStyle(brandStyle)}
+Unique selling points: ${brandProfile.uniqueSellingPoints}${formatBrandStyle(brandStyle)}${formatAvailableAssets(available)}
 
 Campaign brief: ${brief}${inspirationBlock}
 

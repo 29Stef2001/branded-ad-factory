@@ -64,6 +64,7 @@ export const generationStatusEnum = z.enum([
 
 export type GenerationStatus = z.infer<typeof generationStatusEnum>;
 
+// Mirrors the check constraint on brand_assets.asset_type.
 export const brandAssetTypeEnum = z.enum([
   "logo",
   "icon",
@@ -72,6 +73,10 @@ export const brandAssetTypeEnum = z.enum([
   "thank_you_card",
   "shopping_bag",
   "storefront",
+  // The two the model must never invent: the brand's actual owner, and an
+  // actual product from the store.
+  "owner",
+  "product",
   "other",
 ]);
 

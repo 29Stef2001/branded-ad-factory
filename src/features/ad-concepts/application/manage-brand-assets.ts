@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { brandAssetSchema } from "@/features/ad-concepts/domain/schemas";
 import { validateUpload } from "@/features/ad-concepts/domain/asset-upload";
+import { parseTags } from "@/features/ad-concepts/domain/asset-tags";
 import { isAllowedExternalImageHost } from "@/features/ad-concepts/infrastructure/image-generation-client";
 import {
   createBrandAsset,
@@ -88,8 +89,18 @@ export async function createBrandAssetAction(
   }
 
   try {
-    await createBrandAsset({ ...parsed.data, ...source });
+    await createBrandAsset({
+      ...parsed.data,
+      ...source,
+      tags: parseTags(formData.get("tags")),
+    });
   } catch (error) {
+    // Postgres errors arrive as objects, not Error instances, so `.message`
+    // alone loses the code that says what actually went wrong.
+    console.error("Failed to create brand asset", {
+      assetType: parsed.data.assetType,
+      error,
+    });
     return {
       status: "error",
       message: error instanceof Error ? error.message : "Could not add asset.",
@@ -163,6 +174,8 @@ export async function updateBrandAssetAction(
     updates[field] = parsed.data;
   }
 
+  const rawTags = formData.get("tags");
+
   const denied = await requireUser();
   if (denied) return denied;
 
@@ -170,6 +183,9 @@ export async function updateBrandAssetAction(
     await updateBrandAsset(id, {
       ...(typeof imageUrl === "string" && imageUrl.trim() && { imageUrl }),
       ...updates,
+      // Replaced wholesale rather than merged: an empty box means "no tags",
+      // which merging would make impossible to express.
+      ...(typeof rawTags === "string" && { tags: parseTags(rawTags) }),
     });
   } catch (error) {
     return {

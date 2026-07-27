@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { createBrandAssetAction } from "@/features/ad-concepts/application/manage-brand-assets";
 import { initialActionState } from "@/features/ad-concepts/application/types";
 import { ACCEPT_ATTRIBUTE } from "@/features/ad-concepts/domain/asset-upload";
+import { SUGGESTED_TAGS } from "@/features/ad-concepts/domain/asset-tags";
 import type { BrandAssetType } from "@/features/ad-concepts/domain/schemas";
 
 type Source = "upload" | "url";
@@ -104,6 +105,18 @@ export function AddBrandAssetForm({
         <div className="grid grid-cols-2 gap-2">
           <Input name="region" placeholder="Region" />
           <Input name="season" placeholder="Season" />
+        </div>
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <Input
+            name="tags"
+            placeholder="Tags, comma separated — e.g. premium, lifestyle, christmas"
+            list={`${fieldId}-tag-suggestions`}
+          />
+          <datalist id={`${fieldId}-tag-suggestions`}>
+            {SUGGESTED_TAGS.map((tag) => (
+              <option key={tag} value={tag} />
+            ))}
+          </datalist>
         </div>
       </div>
 

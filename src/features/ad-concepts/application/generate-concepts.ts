@@ -7,6 +7,7 @@ import {
   getBrandProfile,
   getInspirationAd,
   insertConcepts,
+  listBrandAssets,
   listEnabledApprovedMessages,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 import { toUserFacingError } from "@/features/ad-concepts/domain/generation-errors";
@@ -39,12 +40,19 @@ export async function generateConceptsAction(
     };
   }
 
-  const [inspirationAd, enabledMessages] = await Promise.all([
+  const [inspirationAd, enabledMessages, brandAssets] = await Promise.all([
     parsed.data.inspirationAdId
       ? getInspirationAd(parsed.data.inspirationAdId)
       : null,
     listEnabledApprovedMessages(),
+    listBrandAssets(),
   ]);
+
+  // Only active assets count: a disabled one will not be attached at
+  // generation time, so promising it to the model would be a lie.
+  const activeAssets = brandAssets.filter((asset) => asset.is_active);
+  const availableTypes = [...new Set(activeAssets.map((a) => a.asset_type))];
+  const availableTags = [...new Set(activeAssets.flatMap((a) => a.tags))];
 
   try {
     const output = await generateConcepts(
@@ -65,6 +73,12 @@ export async function generateConceptsAction(
       },
       parsed.data.brief,
       enabledMessages.map((m) => m.message),
+      {
+        types: availableTypes,
+        tags: availableTags,
+        hasOwner: availableTypes.includes("owner"),
+        hasProduct: availableTypes.includes("product"),
+      },
       inspirationAd
         ? {
             competitorName: inspirationAd.competitorName,

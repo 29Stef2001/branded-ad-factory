@@ -41,6 +41,7 @@ export type BrandAssetRow = {
   region: string | null;
   season: string | null;
   sort_order: number;
+  tags: string[];
 };
 
 /**
@@ -405,16 +406,39 @@ export async function getConceptForGeneration(
   };
 }
 
+/**
+ * Retried because this upload happens *after* the image has been generated and
+ * paid for. Observed failing twice in four runs with a bare "fetch failed"
+ * from the Storage client — a network-level blip on a ~1.7 MB body, not a
+ * rejection. Without a retry each blip discards a finished image and the user
+ * pays again to get back to the same point.
+ *
+ * Only three attempts, with a short backoff: this sits inside a request that
+ * has already taken over a minute, so retrying for long enough to hit a
+ * serverless timeout would trade one failure for a worse one.
+ */
 export async function uploadConceptImage(
   path: string,
   image: Buffer,
 ): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase.storage
-    .from(CREATIVE_IMAGES_BUCKET)
-    .upload(path, image, { contentType: "image/png", upsert: true });
+  const attempts = 3;
 
-  if (error) throw error;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const supabase = await createClient();
+    const { error } = await supabase.storage
+      .from(CREATIVE_IMAGES_BUCKET)
+      .upload(path, image, { contentType: "image/png", upsert: true });
+
+    if (!error) return;
+
+    if (attempt === attempts) throw error;
+
+    console.warn(
+      `Creative image upload failed (attempt ${attempt}/${attempts}), retrying`,
+      { path, error },
+    );
+    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+  }
 }
 
 export async function setConceptImagePath(
@@ -469,7 +493,7 @@ export async function insertRefinedConcept(
 // ---------------------------------------------------------------------------
 
 const BRAND_ASSET_SELECT =
-  "id, asset_type, label, image_url, storage_path, is_primary, is_active, region, season, sort_order";
+  "id, asset_type, label, image_url, storage_path, is_primary, is_active, region, season, sort_order, tags";
 
 const BRAND_ASSETS_BUCKET = "brand-assets";
 
@@ -630,6 +654,7 @@ export async function createBrandAsset(input: {
   isActive: boolean;
   region?: string;
   season?: string;
+  tags?: string[];
 }): Promise<void> {
   const brandProfileId = await getBrandProfileId();
   if (!brandProfileId) throw new Error("Brand profile not found.");
@@ -649,6 +674,7 @@ export async function createBrandAsset(input: {
     is_active: input.isActive,
     region: input.region ?? null,
     season: input.season ?? null,
+    tags: input.tags ?? [],
   });
 
   if (error) throw error;
@@ -664,6 +690,7 @@ export async function updateBrandAsset(
     isActive?: boolean;
     region?: string;
     season?: string;
+    tags?: string[];
   },
 ): Promise<void> {
   const supabase = await createClient();
@@ -704,6 +731,7 @@ export async function updateBrandAsset(
       ...(input.isActive !== undefined && { is_active: input.isActive }),
       ...(input.region !== undefined && { region: input.region }),
       ...(input.season !== undefined && { season: input.season }),
+      ...(input.tags !== undefined && { tags: input.tags }),
     })
     .eq("id", id);
 

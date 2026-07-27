@@ -129,6 +129,33 @@ export async function generateCreativeImageAction(
     hasLogo,
   );
 
+  // Selection is where a disappointing image usually starts, and it is
+  // invisible from the result alone — the log is the only place the reasoning
+  // survives. Scores come back from the domain function, which stays IO-free.
+  console.log(
+    "Reference asset selection",
+    // Serialised rather than passed as an object: console.log truncates nested
+    // structures to "[Object]" at depth, which hides the per-asset scores that
+    // are the only reason this log exists.
+    JSON.stringify(
+      {
+        conceptId,
+        requestedRequirements: concept.brandAssetRequirements,
+        usableRequirements: requirements,
+        candidatesConsidered: brandAssets.length,
+        scores: selection.scores,
+        selected: selection.selected.map((entry) => ({
+          role: entry.role,
+          assetId: entry.asset?.id ?? null,
+          label: entry.asset?.label ?? null,
+        })),
+        overflow: selection.overflowNotes,
+      },
+      null,
+      2,
+    ),
+  );
+
   const attemptNumber = (await countGenerationAttempts(conceptId)) + 1;
   const attemptId = await insertGenerationAttempt({
     conceptId,

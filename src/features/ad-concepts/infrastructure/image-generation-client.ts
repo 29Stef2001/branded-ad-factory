@@ -104,7 +104,9 @@ function describeReference(
 
   switch (reference.role) {
     case "product":
-      return `${position} shows an actual "${brandName}" product that must be preserved exactly as-is — its shape, color, material, and details must not change. Place this exact product into the scene, changing only the environment, lighting, and styling around it — never the product itself.`;
+      return `${position} shows an actual "${brandName}" product that must be preserved exactly as-is — its shape, color, material, patina and details must not change. The jewellery visible in the scene must be this exact piece, not an invented or generic substitute. Change only the environment, lighting and styling around it — never the product itself.`;
+    case "owner":
+      return `${position} shows the real owner of "${brandName}". When a person appears in the scene, it is her — match her age, build, hair, and face as closely as you can, and do not substitute a different person or gender. She is the brand's actual owner, not a hired model.`;
     case "logo":
       return `${position} shows the real "${brandName}" brand logo — reproduce it faithfully, do not redesign, restyle, or reinterpret it. Where packaging, a box or a sign appears in the scene, show this exact logo on it.`;
     default:
@@ -156,6 +158,13 @@ function buildPrompt(
       "Do not render any words, letters, headlines, or text overlays in the image, beyond a brand logo if one is supplied as a reference.",
     );
   }
+
+  // The store sells to a US audience, so any lettering the model does render —
+  // signage, packaging, a price card — has to be English. Stated last so it
+  // reads as an overriding rule rather than one detail among many.
+  sections.push(
+    "All text visible anywhere in the image must be in English. Never render Dutch or any other language.",
+  );
 
   return sections.join("\n\n").trim();
 }
