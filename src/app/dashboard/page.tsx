@@ -1,18 +1,223 @@
 import type { Metadata } from "next";
-import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
+import Link from "next/link";
+import {
+  BadgeCheck,
+  Images,
+  Lightbulb,
+  MessageSquare,
+  Sparkles,
+} from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
+import { DarkPanel } from "@/components/layout/dark-panel";
+import { MetricCard } from "@/components/data/metric-card";
+import { StatusBadge, type StatusTone } from "@/components/data/status-badge";
+import { buttonVariants } from "@/components/ui/button";
+import { BrandCompletenessPanel } from "@/features/ad-concepts/ui/brand-completeness-panel";
+import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
+import { recommendNextAction } from "@/features/ad-concepts/domain/next-action";
+import {
+  getBrandProfile,
+  getDashboardStats,
+  listRecentActivity,
+} from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 export const metadata: Metadata = { title: "Dashboard — Branded Ad Factory" };
 
+const STATUS_TONE: Record<string, StatusTone> = {
+  approved: "success",
+  generated: "success",
+  needs_review: "warning",
+  failed: "danger",
+  generating: "accent",
+  qa_in_progress: "accent",
+};
+
+function timeAgo(iso: string): string {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  const [profile, stats, activity] = await Promise.all([
+    getBrandProfile(),
+    getDashboardStats(),
+    listRecentActivity(),
+  ]);
+
+  const completeness = assessBrandCompleteness(profile);
+  const nextAction = recommendNextAction({
+    hasProfile: profile !== null,
+    completeness,
+    hasOwnerAsset: stats.hasOwnerAsset,
+    hasProductAsset: stats.hasProductAsset,
+    hasLogoAsset: stats.hasLogoAsset,
+    messagesEnabled: stats.messagesEnabled,
+    conceptsTotal: stats.conceptsTotal,
+    conceptsWithImage: stats.conceptsWithImage,
+    qaFailed: stats.qaFailed,
+  });
+
+  const missingAssetTypes = [
+    !stats.hasOwnerAsset && "owner",
+    !stats.hasProductAsset && "product",
+    !stats.hasLogoAsset && "logo",
+  ].filter(Boolean) as string[];
 
   return (
-    <div className="flex flex-col gap-2">
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-      <p className="text-muted-foreground">
-        Signed in as{" "}
-        <span className="font-medium text-foreground">{user?.email}</span>.
-      </p>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        eyebrow={profile?.brand_name ?? "No brand yet"}
+        title="Dashboard"
+        description="Where this brand stands, and what is worth doing next."
+      />
+
+      {/* The recommendation leads, because a dashboard full of numbers still
+          leaves the reader deciding what to do with them. */}
+      <DarkPanel
+        title="Recommended next"
+        actions={
+          <StatusBadge
+            label={nextAction.severity}
+            tone={
+              nextAction.severity === "blocking"
+                ? "danger"
+                : nextAction.severity === "important"
+                  ? "warning"
+                  : "muted"
+            }
+          />
+        }
+        contentClassName="flex flex-wrap items-end justify-between gap-4"
+      >
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="text-base font-semibold tracking-tight">
+            {nextAction.title}
+          </p>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            {nextAction.reason}
+          </p>
+        </div>
+        <Link href={nextAction.href} className={buttonVariants({ size: "sm" })}>
+          {nextAction.cta}
+        </Link>
+      </DarkPanel>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Brand profile"
+          value={`${completeness.score}%`}
+          sub={`${completeness.filledCount} of ${completeness.totalCount} fields`}
+          icon={Sparkles}
+          href="/dashboard/brand-profile"
+          tone={completeness.score >= 85 ? "success" : "warning"}
+        />
+        <MetricCard
+          label="Brand assets"
+          value={stats.assetsActive}
+          sub={
+            missingAssetTypes.length
+              ? `missing: ${missingAssetTypes.join(", ")}`
+              : "owner, product and logo present"
+          }
+          icon={Images}
+          href="/dashboard/creative-studio/brand-assets"
+          tone={missingAssetTypes.length ? "warning" : "success"}
+        />
+        <MetricCard
+          label="Concepts"
+          value={stats.conceptsTotal}
+          sub={`${stats.conceptsWithImage} with an image`}
+          icon={Lightbulb}
+          href="/dashboard/concepts"
+        />
+        <MetricCard
+          label="Messages"
+          value={stats.messagesEnabled}
+          sub={`${stats.messagesTotal} total, ${stats.messagesTotal - stats.messagesEnabled} disabled`}
+          icon={MessageSquare}
+          href="/dashboard/concepts"
+          tone={stats.messagesEnabled === 0 ? "danger" : "default"}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard
+          label="Images generated"
+          value={stats.generationsTotal}
+          sub="attempts, successful and failed"
+          icon={Images}
+        />
+        <MetricCard
+          label="QA passed"
+          value={stats.qaPassed}
+          sub={`${stats.qaFailed} failed, ${stats.qaUnreviewed} unreviewed`}
+          icon={BadgeCheck}
+          tone={stats.qaFailed > 0 ? "warning" : "success"}
+        />
+        <MetricCard
+          label="QA failed"
+          value={stats.qaFailed}
+          sub={
+            stats.qaFailed > 0
+              ? "each has a suggested prompt fix"
+              : "nothing needs review"
+          }
+          icon={BadgeCheck}
+          href="/dashboard/creative-studio/prompt-builder"
+          tone={stats.qaFailed > 0 ? "danger" : "success"}
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <DarkPanel
+          title="Recent activity"
+          description={
+            activity.length === 0
+              ? "Nothing generated yet"
+              : `Last ${activity.length} generation attempts`
+          }
+          contentClassName="flex flex-col gap-2"
+        >
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Generation attempts appear here as soon as one runs — successful
+              or not.
+            </p>
+          ) : (
+            activity.map((item) => (
+              <Link
+                key={item.id}
+                href={`/dashboard/creative-studio/prompt-builder?concept=${item.conceptId}`}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-2 transition-colors hover:border-primary/40"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {item.conceptHeadline}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  attempt {item.attemptNumber}
+                </span>
+                <StatusBadge
+                  label={
+                    item.qaScore !== null
+                      ? `${item.status.replace(/_/g, " ")} · ${item.qaScore}`
+                      : item.status.replace(/_/g, " ")
+                  }
+                  tone={STATUS_TONE[item.status] ?? "neutral"}
+                />
+                <span className="w-16 text-right text-xs text-muted-foreground">
+                  {timeAgo(item.createdAt)}
+                </span>
+              </Link>
+            ))
+          )}
+        </DarkPanel>
+
+        <BrandCompletenessPanel completeness={completeness} compact />
+      </div>
     </div>
   );
 }

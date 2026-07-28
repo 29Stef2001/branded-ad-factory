@@ -1250,3 +1250,140 @@ export async function updateConceptGenerationStatus(
 
   if (error) throw error;
 }
+
+export type DashboardStats = {
+  assetsTotal: number;
+  assetsActive: number;
+  hasOwnerAsset: boolean;
+  hasProductAsset: boolean;
+  hasLogoAsset: boolean;
+  conceptsTotal: number;
+  conceptsWithImage: number;
+  generationsTotal: number;
+  qaPassed: number;
+  qaFailed: number;
+  qaUnreviewed: number;
+  messagesTotal: number;
+  messagesEnabled: number;
+};
+
+/**
+ * Counts for the dashboard, as head-only queries so the page costs a handful of
+ * counts rather than pulling every row back to measure it.
+ */
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const supabase = await createClient();
+  const HEAD = { count: "exact" as const, head: true };
+
+  const [assets, messages] = await Promise.all([
+    listBrandAssets(),
+    listApprovedMessages(),
+  ]);
+
+  // Written out rather than routed through a generic helper: the Supabase
+  // builder changes type after each filter, so a shared wrapper ends up fighting
+  // its own generics for no real saving.
+  const [
+    conceptsTotal,
+    conceptsWithImage,
+    generationsTotal,
+    qaPassed,
+    qaFailed,
+    qaUnreviewed,
+  ] = await Promise.all([
+    supabase.from("ad_concepts").select("*", HEAD),
+    supabase
+      .from("ad_concepts")
+      .select("*", HEAD)
+      .not("creative_image_path", "is", null),
+    supabase.from("creative_generations").select("*", HEAD),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .eq("qa_passed", true),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .eq("qa_passed", false),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .is("qa_passed", null),
+  ]);
+
+  for (const result of [
+    conceptsTotal,
+    conceptsWithImage,
+    generationsTotal,
+    qaPassed,
+    qaFailed,
+    qaUnreviewed,
+  ]) {
+    if (result.error) throw result.error;
+  }
+
+  return {
+    assetsTotal: assets.length,
+    assetsActive: assets.filter((a) => a.is_active).length,
+    hasOwnerAsset: assets.some((a) => a.asset_type === "owner" && a.is_active),
+    hasProductAsset: assets.some(
+      (a) => a.asset_type === "product" && a.is_active,
+    ),
+    hasLogoAsset: assets.some((a) => a.asset_type === "logo" && a.is_active),
+    conceptsTotal: conceptsTotal.count ?? 0,
+    conceptsWithImage: conceptsWithImage.count ?? 0,
+    generationsTotal: generationsTotal.count ?? 0,
+    qaPassed: qaPassed.count ?? 0,
+    qaFailed: qaFailed.count ?? 0,
+    qaUnreviewed: qaUnreviewed.count ?? 0,
+    messagesTotal: messages.length,
+    messagesEnabled: messages.filter((m) => m.is_active).length,
+  };
+}
+
+export type ActivityItem = {
+  id: string;
+  attemptNumber: number;
+  status: string;
+  qaScore: number | null;
+  qaPassed: boolean | null;
+  createdAt: string;
+  conceptHeadline: string;
+  conceptId: string;
+};
+
+/** The most recent generation attempts, newest first. */
+export async function listRecentActivity(limit = 8): Promise<ActivityItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("creative_generations")
+    .select(
+      "id, attempt_number, status, qa_score, qa_passed, created_at, concept_id, ad_concepts(headline)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return (
+    data as unknown as Array<{
+      id: string;
+      attempt_number: number;
+      status: string;
+      qa_score: number | null;
+      qa_passed: boolean | null;
+      created_at: string;
+      concept_id: string;
+      ad_concepts: { headline: string } | null;
+    }>
+  ).map((row) => ({
+    id: row.id,
+    attemptNumber: row.attempt_number,
+    status: row.status,
+    qaScore: row.qa_score,
+    qaPassed: row.qa_passed,
+    createdAt: row.created_at,
+    conceptId: row.concept_id,
+    conceptHeadline: row.ad_concepts?.headline ?? "Deleted concept",
+  }));
+}

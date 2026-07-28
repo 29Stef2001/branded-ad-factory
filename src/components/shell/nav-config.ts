@@ -109,8 +109,7 @@ export const NAV_TREE: NavEntry[] = [
     label: "Creative Studio",
     icon: Palette,
     items: [
-      // Brand profile, concept generation, refinement and the Creative
-      // Generator all live on this page today.
+      { label: "Brand Profile", segment: "brand-profile", status: "live" },
       { label: "Concepts", segment: "concepts", status: "live" },
       {
         label: "Brand Assets",

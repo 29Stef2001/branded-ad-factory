@@ -8,8 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DarkPanel } from "@/components/layout/dark-panel";
+import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
 import { buttonVariants } from "@/components/ui/button";
-import { BrandProfileForm } from "@/features/ad-concepts/ui/brand-profile-form";
 import { GenerateConceptsForm } from "@/features/ad-concepts/ui/generate-concepts-form";
 import { ConceptCard } from "@/features/ad-concepts/ui/concept-card";
 import { ApprovedMessagesManager } from "@/features/ad-concepts/ui/approved-messages-manager";
@@ -41,6 +41,8 @@ export default async function ConceptsPage() {
       listApprovedMessages(),
     ]);
 
+  const completeness = assessBrandCompleteness(brandProfile);
+
   const imagePaths = concepts
     .map((concept) => concept.creative_image_path)
     .filter((path): path is string => path !== null);
@@ -58,17 +60,18 @@ export default async function ConceptsPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
         <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Brand profile</CardTitle>
-              <CardDescription>
-                This context shapes every concept Claude generates.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <BrandProfileForm profile={brandProfile} />
-            </CardContent>
-          </Card>
+          <DarkPanel
+            title="Brand profile"
+            description={`${completeness.score}% complete — read by every AI module.`}
+            actions={
+              <Link
+                href="/dashboard/brand-profile"
+                className={buttonVariants({ size: "sm", variant: "outline" })}
+              >
+                Edit profile
+              </Link>
+            }
+          />
 
           {brandProfile && (
             <Card>
