@@ -4,6 +4,12 @@ import {
   qaResultSchema,
   type QaResult,
 } from "@/features/ad-concepts/domain/schemas";
+import {
+  renderBrandHeadline,
+  renderBrandStyle,
+  renderLanguageRule,
+  type BrandContext,
+} from "@/features/ad-concepts/domain/brand-context";
 import { env } from "@/lib/env";
 
 const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
@@ -29,7 +35,8 @@ export type QaReference = {
 };
 
 export type QaInput = {
-  brandName: string;
+  /** Same brand facts the image was generated from, via the shared builder. */
+  brand: BrandContext;
   /** The prompt the image was generated from. */
   scenePrompt: string;
   /** Exact approved copy that should appear, if the concept picked one. */
@@ -84,7 +91,9 @@ export async function runImageQa(input: QaInput): Promise<QaResult> {
         content: [
           {
             type: "text",
-            text: `You are a strict creative quality reviewer for "${input.brandName}". Judge the GENERATED IMAGE below against the reference images and the brief. Be conservative: this decides whether an ad is fit to spend money on.
+            text: `You are a strict creative quality reviewer for ${renderBrandHeadline(input.brand)}. Judge the GENERATED IMAGE below against the reference images and the brief. Be conservative: this decides whether an ad is fit to spend money on.
+
+${renderBrandStyle(input.brand)}
 
 The image was generated from this scene prompt:
 """
@@ -105,7 +114,7 @@ Judge specifically:
 - Does the product shown match the product reference exactly — shape, material, finish, patina? Report productMaterialChanged if copper has become gold, matte has become glossy, and so on.
 - Is the logo reproduced exactly, not redrawn or restyled?
 - If an owner reference is supplied, is the person shown the same person — same gender, roughly the same age and build? Set ownerReferenceProvided accordingly, and set ownerMatchesReference to true when no owner reference was given.
-- Is every visible word English? This brand sells to a United States audience; Dutch or any other language is a failure.
+- ${renderLanguageRule("image")} Judge allVisibleTextIsEnglish against that rule.
 - Are there spelling mistakes in any visible text?
 - Are there AI artifacts a viewer would notice — malformed hands, extra fingers, warped edges, nonsense lettering?
 - Does the composition actually follow the scene prompt?

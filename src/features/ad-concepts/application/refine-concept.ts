@@ -8,6 +8,7 @@ import {
   getConcept,
   insertRefinedConcept,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import { buildBrandContext } from "@/features/ad-concepts/domain/brand-context";
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import type { ActionState } from "@/features/ad-concepts/application/types";
 
@@ -45,13 +46,11 @@ export async function refineConceptAction(
   }
 
   try {
-    const refined = await refineConcept(original, parsed.data.instruction, {
-      brandName: brandProfile.brand_name,
-      industry: brandProfile.industry,
-      tone: brandProfile.tone,
-      targetAudience: brandProfile.target_audience,
-      uniqueSellingPoints: brandProfile.unique_selling_points,
-    });
+    const refined = await refineConcept(
+      original,
+      parsed.data.instruction,
+      buildBrandContext(brandProfile),
+    );
 
     await insertRefinedConcept(
       user.id,

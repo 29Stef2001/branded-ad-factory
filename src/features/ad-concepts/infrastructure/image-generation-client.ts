@@ -1,12 +1,17 @@
 import OpenAI, { toFile } from "openai";
+import {
+  renderBrandHeadline,
+  renderBrandStyle,
+  renderLanguageRule,
+  type BrandContext,
+} from "@/features/ad-concepts/domain/brand-context";
 import { env } from "@/lib/env";
 
 const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
 export type ImagePromptInput = {
-  brandName: string;
-  industry: string;
-  tone: string;
+  /** Brand facts, rendered by the shared builder rather than restated here. */
+  brand: BrandContext;
   /**
    * The concept's self-contained scene description — `final_generation_prompt`
    * when the concept has one, falling back to `visual_direction` for concepts
@@ -119,18 +124,21 @@ function buildPrompt(
   references: NamedReference[],
 ): string {
   const sections: string[] = [
-    `Create a high-quality advertising visual for "${input.brandName}" (${input.industry} industry, ${input.tone} tone).`,
+    `Create a high-quality advertising visual for ${renderBrandHeadline(input.brand)}.`,
   ];
 
   if (references.length > 0) {
     sections.push(
       references
         .map((reference, index) =>
-          describeReference(reference, index, input.brandName),
+          describeReference(reference, index, input.brand.brandName),
         )
         .join("\n\n"),
     );
   }
+
+  const style = renderBrandStyle(input.brand);
+  if (style) sections.push(style);
 
   sections.push(`Scene: ${input.scenePrompt}`);
 
@@ -162,9 +170,7 @@ function buildPrompt(
   // The store sells to a US audience, so any lettering the model does render —
   // signage, packaging, a price card — has to be English. Stated last so it
   // reads as an overriding rule rather than one detail among many.
-  sections.push(
-    "All text visible anywhere in the image must be in English. Never render Dutch or any other language.",
-  );
+  sections.push(renderLanguageRule("image"));
 
   return sections.join("\n\n").trim();
 }

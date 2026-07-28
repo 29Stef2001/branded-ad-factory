@@ -10,6 +10,7 @@ import {
   listBrandAssets,
   listEnabledApprovedMessages,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import { buildBrandContext } from "@/features/ad-concepts/domain/brand-context";
 import { toUserFacingError } from "@/features/ad-concepts/domain/generation-errors";
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import type { ActionState } from "@/features/ad-concepts/application/types";
@@ -56,21 +57,7 @@ export async function generateConceptsAction(
 
   try {
     const output = await generateConcepts(
-      {
-        brandName: brandProfile.brand_name,
-        industry: brandProfile.industry,
-        tone: brandProfile.tone,
-        targetAudience: brandProfile.target_audience,
-        uniqueSellingPoints: brandProfile.unique_selling_points,
-      },
-      {
-        brandColors: brandProfile.brand_colors,
-        typographyNotes: brandProfile.typography_notes,
-        embossStyle: brandProfile.emboss_style,
-        embossCustomNotes: brandProfile.emboss_custom_notes,
-        foilStyle: brandProfile.foil_style,
-        foilCustomNotes: brandProfile.foil_custom_notes,
-      },
+      buildBrandContext(brandProfile),
       parsed.data.brief,
       enabledMessages.map((m) => m.message),
       {

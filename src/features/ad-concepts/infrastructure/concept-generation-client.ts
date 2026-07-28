@@ -6,63 +6,22 @@ import {
   type Concept,
   type ConceptsOutputV2,
 } from "@/features/ad-concepts/domain/schemas";
+import {
+  renderBrandHeadline,
+  renderBrandIdentity,
+  renderBrandStyle,
+  renderLanguageRule,
+  type BrandContext,
+} from "@/features/ad-concepts/domain/brand-context";
 import { env } from "@/lib/env";
 
 const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-
-export type BrandProfileInput = {
-  brandName: string;
-  industry: string;
-  tone: string;
-  targetAudience: string;
-  uniqueSellingPoints: string;
-};
-
-export type BrandStyleInput = {
-  brandColors: {
-    primary?: string;
-    secondary?: string;
-    accent?: string;
-    background?: string;
-  } | null;
-  typographyNotes: string | null;
-  embossStyle: string | null;
-  embossCustomNotes: string | null;
-  foilStyle: string | null;
-  foilCustomNotes: string | null;
-};
 
 export type InspirationInput = {
   competitorName: string;
   adCopy: string;
   messagingAngle: string;
 } | null;
-
-function formatBrandStyle(style: BrandStyleInput): string {
-  const lines: string[] = [];
-  if (style.brandColors) {
-    const colors = Object.entries(style.brandColors)
-      .filter(([, value]) => value)
-      .map(([role, value]) => `${role}: ${value}`)
-      .join(", ");
-    if (colors) lines.push(`Brand colors — ${colors}`);
-  }
-  if (style.typographyNotes)
-    lines.push(`Typography — ${style.typographyNotes}`);
-  if (style.embossStyle && style.embossStyle !== "none") {
-    lines.push(
-      `Emboss treatment — ${style.embossStyle}${style.embossCustomNotes ? ` (${style.embossCustomNotes})` : ""}`,
-    );
-  }
-  if (style.foilStyle && style.foilStyle !== "none") {
-    lines.push(
-      `Foil treatment — ${style.foilStyle}${style.foilCustomNotes ? ` (${style.foilCustomNotes})` : ""}`,
-    );
-  }
-  return lines.length > 0
-    ? `\n\nBrand style settings:\n${lines.join("\n")}`
-    : "";
-}
 
 /**
  * Which asset types the brand actually has on file, and their labels.
@@ -109,8 +68,7 @@ function formatAvailableAssets(available: AvailableAssetsInput): string {
 }
 
 export async function generateConcepts(
-  brandProfile: BrandProfileInput,
-  brandStyle: BrandStyleInput,
+  brand: BrandContext,
   brief: string,
   enabledMessages: string[],
   available: AvailableAssetsInput,
@@ -145,13 +103,10 @@ export async function generateConcepts(
         role: "user",
         content: `You are a senior direct-response creative strategist producing realistic, high-converting ad concepts — the kind that win on Facebook and Instagram through authenticity, urgency, and documentary-style realism, not polished studio advertising.
 
-Write every field in English. This brand sells to a United States audience, so all copy, all scene descriptions, and any text that will appear inside the image must be English — regardless of the language of the campaign brief.
+${renderLanguageRule("copy")}
 
-Brand: ${brandProfile.brandName}
-Industry: ${brandProfile.industry}
-Tone of voice: ${brandProfile.tone}
-Target audience: ${brandProfile.targetAudience}
-Unique selling points: ${brandProfile.uniqueSellingPoints}${formatBrandStyle(brandStyle)}${formatAvailableAssets(available)}
+${renderBrandIdentity(brand)}
+${renderBrandStyle(brand)}${formatAvailableAssets(available)}
 
 Campaign brief: ${brief}${inspirationBlock}
 
@@ -175,7 +130,7 @@ For each concept, think like you're directing a real photo/video shoot: consider
 export async function refineConcept(
   original: Concept,
   instruction: string,
-  brandProfile: BrandProfileInput,
+  brand: BrandContext,
 ): Promise<Concept> {
   const message = await client.messages.parse({
     model: "claude-opus-5",
@@ -187,7 +142,7 @@ export async function refineConcept(
     messages: [
       {
         role: "user",
-        content: `You are a senior ad copywriter. Refine the following ad concept for "${brandProfile.brandName}" (${brandProfile.industry}, tone: ${brandProfile.tone}) based on the given instruction. Keep what already works; only change what the instruction asks for.
+        content: `You are a senior ad copywriter. Refine the following ad concept for ${renderBrandHeadline(brand)} based on the given instruction. Keep what already works; only change what the instruction asks for.
 
 Current concept:
 Headline: ${original.headline}

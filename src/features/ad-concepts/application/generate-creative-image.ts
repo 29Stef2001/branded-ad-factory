@@ -8,6 +8,7 @@ import {
 } from "@/features/ad-concepts/domain/schemas";
 import { selectReferenceAssets } from "@/features/ad-concepts/domain/asset-selection";
 import { toUserFacingError } from "@/features/ad-concepts/domain/generation-errors";
+import { buildBrandContext } from "@/features/ad-concepts/domain/brand-context";
 import { evaluateQa } from "@/features/ad-concepts/domain/qa-evaluation";
 import { runImageQa } from "@/features/ad-concepts/infrastructure/qa-client";
 import {
@@ -125,6 +126,8 @@ export async function generateCreativeImageAction(
       brandAssetTypeEnum.safeParse(value).success,
   );
 
+  const brandContext = buildBrandContext(brandProfile);
+
   const selection = selectReferenceAssets(
     requirements,
     brandAssets,
@@ -212,9 +215,7 @@ export async function generateCreativeImageAction(
 
     const image = await generateConceptImage(
       {
-        brandName: brandProfile.brand_name,
-        industry: brandProfile.industry,
-        tone: brandProfile.tone,
+        brand: brandContext,
         scenePrompt: concept.finalGenerationPrompt,
         promotionalMessage: concept.promotionalMessage,
         messagePlacement: concept.messagePlacement,
@@ -244,7 +245,7 @@ export async function generateCreativeImageAction(
     try {
       const approvedMessages = await listEnabledApprovedMessages();
       const qa = await runImageQa({
-        brandName: brandProfile.brand_name,
+        brand: brandContext,
         scenePrompt: concept.finalGenerationPrompt,
         approvedMessage: concept.promotionalMessage,
         allApprovedMessages: approvedMessages.map((m) => m.message),
