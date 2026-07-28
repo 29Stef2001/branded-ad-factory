@@ -10,30 +10,27 @@ import {
 import { PageHeader } from "@/components/layout/page-header";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { MetricCard } from "@/components/data/metric-card";
-import { StatusBadge, type StatusTone } from "@/components/data/status-badge";
+import { StatusBadge } from "@/components/data/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { BrandCompletenessPanel } from "@/features/ad-concepts/ui/brand-completeness-panel";
 import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
 import { recommendNextAction } from "@/features/ad-concepts/domain/next-action";
+import {
+  GENERATION_STATUS_LABELS,
+  GENERATION_STATUS_TONES,
+  labelFor,
+} from "@/features/ad-concepts/domain/labels";
 import { buildWorkflow } from "@/features/ad-concepts/domain/workflow";
 import { WorkflowProgress } from "@/features/ad-concepts/ui/workflow-progress";
 import { getLaunchStatus } from "@/features/ad-launch/application/get-launch-status";
 import {
   getBrandProfile,
+  failStaleGenerations,
   getDashboardStats,
   listRecentActivity,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 export const metadata: Metadata = { title: "Dashboard — Branded Ad Factory" };
-
-const STATUS_TONE: Record<string, StatusTone> = {
-  approved: "success",
-  generated: "success",
-  needs_review: "warning",
-  failed: "danger",
-  generating: "accent",
-  qa_in_progress: "accent",
-};
 
 function timeAgo(iso: string): string {
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -45,6 +42,10 @@ function timeAgo(iso: string): string {
 }
 
 export default async function DashboardPage() {
+  // Runs before the counts are read, so an interrupted attempt is not
+  // reported as in-progress work that will never finish.
+  await failStaleGenerations();
+
   const [profile, stats, activity, launchStatus] = await Promise.all([
     getBrandProfile(),
     getDashboardStats(),
@@ -224,10 +225,10 @@ export default async function DashboardPage() {
                 <StatusBadge
                   label={
                     item.qaScore !== null
-                      ? `${item.status.replace(/_/g, " ")} · ${item.qaScore}`
-                      : item.status.replace(/_/g, " ")
+                      ? `${labelFor(GENERATION_STATUS_LABELS, item.status)} · ${item.qaScore}`
+                      : labelFor(GENERATION_STATUS_LABELS, item.status)
                   }
-                  tone={STATUS_TONE[item.status] ?? "neutral"}
+                  tone={GENERATION_STATUS_TONES[item.status] ?? "neutral"}
                 />
                 <span className="w-16 text-right text-xs text-muted-foreground">
                   {timeAgo(item.createdAt)}

@@ -12,13 +12,13 @@ import {
   toggleBrandAssetActiveAction,
   updateBrandAssetAction,
 } from "@/features/ad-concepts/application/manage-brand-assets";
+import { ConfirmButton } from "@/components/data/confirm-button";
 import { initialActionState } from "@/features/ad-concepts/application/types";
 import { formatTags } from "@/features/ad-concepts/domain/asset-tags";
 import type { BrandAssetWithUrl } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 export function BrandAssetRow({ asset }: { asset: BrandAssetWithUrl }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const [deleteState, deleteAction, isDeleting] = useActionState(
     deleteBrandAssetAction.bind(null, asset.id),
@@ -144,40 +144,14 @@ export function BrandAssetRow({ asset }: { asset: BrandAssetWithUrl }) {
           {isEditing ? "Cancel" : "Edit"}
         </Button>
 
-        {/* Delete is the one irreversible action here, so it asks first. The
-            confirm replaces the button in place rather than opening a dialog —
-            fewer moving parts, and it cannot be dismissed by a stray click. */}
-        {confirmingDelete ? (
-          <form action={deleteAction} className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Delete this?</span>
-            <Button
-              type="submit"
-              size="sm"
-              variant="destructive"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Deleting…" : "Yes, delete"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setConfirmingDelete(false)}
-            >
-              Cancel
-            </Button>
-          </form>
-        ) : (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="text-destructive"
-            onClick={() => setConfirmingDelete(true)}
-          >
-            Delete
-          </Button>
-        )}
+        <ConfirmButton
+          action={deleteAction}
+          label="Delete"
+          question="Delete this asset?"
+          confirmLabel="Yes, delete"
+          pendingLabel="Deleting…"
+          isPending={isDeleting}
+        />
       </div>
 
       {isEditing && (

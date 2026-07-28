@@ -1,21 +1,12 @@
 import { DarkPanel } from "@/components/layout/dark-panel";
-import { StatusBadge, type StatusTone } from "@/components/data/status-badge";
+import { StatusBadge } from "@/components/data/status-badge";
+import {
+  GENERATION_STATUS_LABELS,
+  GENERATION_STATUS_TONES,
+  ASSET_ROLE_LABELS,
+  labelFor,
+} from "@/features/ad-concepts/domain/labels";
 import type { CreativeGenerationRow } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
-
-const STATUS_TONE: Record<string, StatusTone> = {
-  queued: "muted",
-  generating: "accent",
-  generated: "success",
-  qa_in_progress: "accent",
-  qa_failed: "warning",
-  retrying: "warning",
-  needs_review: "warning",
-  approved: "success",
-  rejected: "danger",
-  ready_for_publishing: "success",
-  published: "success",
-  failed: "danger",
-};
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -68,8 +59,8 @@ export function GenerationHistory({
                   Attempt {attempt.attempt_number}
                 </span>
                 <StatusBadge
-                  label={attempt.status.replace(/_/g, " ")}
-                  tone={STATUS_TONE[attempt.status] ?? "neutral"}
+                  label={labelFor(GENERATION_STATUS_LABELS, attempt.status)}
+                  tone={GENERATION_STATUS_TONES[attempt.status] ?? "neutral"}
                 />
                 {attempt.qa_passed !== null && (
                   <StatusBadge
@@ -92,7 +83,7 @@ export function GenerationHistory({
                 <p className="text-xs text-muted-foreground">
                   References:{" "}
                   {attempt.selected_reference_roles
-                    .map((role) => role.replace(/_/g, " "))
+                    .map((role) => labelFor(ASSET_ROLE_LABELS, role))
                     .join(", ")}
                 </p>
               )}

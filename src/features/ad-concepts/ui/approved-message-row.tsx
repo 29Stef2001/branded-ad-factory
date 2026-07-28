@@ -10,6 +10,7 @@ import {
   toggleApprovedMessageActiveAction,
   updateApprovedMessageAction,
 } from "@/features/ad-concepts/application/manage-approved-messages";
+import { ConfirmButton } from "@/components/data/confirm-button";
 import { initialActionState } from "@/features/ad-concepts/application/types";
 import type { ApprovedMessageRow as ApprovedMessageRowData } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
@@ -99,17 +100,14 @@ export function ApprovedMessageRow({
         >
           {isEditing ? "Cancel" : "Edit"}
         </Button>
-        <form action={deleteAction}>
-          <Button
-            type="submit"
-            size="sm"
-            variant="outline"
-            disabled={isDeleting}
-            className="text-destructive"
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
-        </form>
+        <ConfirmButton
+          action={deleteAction}
+          label="Delete"
+          question="Delete this message?"
+          confirmLabel="Yes, delete"
+          pendingLabel="Deleting…"
+          isPending={isDeleting}
+        />
       </div>
 
       {isEditing && (

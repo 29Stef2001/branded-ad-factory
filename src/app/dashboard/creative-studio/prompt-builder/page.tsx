@@ -16,6 +16,12 @@ import {
   brandAssetTypeEnum,
   type BrandAssetType,
 } from "@/features/ad-concepts/domain/schemas";
+import {
+  GENERATION_STATUS_LABELS,
+  GENERATION_STATUS_TONES,
+  STRATEGY_LABELS,
+  labelFor,
+} from "@/features/ad-concepts/domain/labels";
 import { selectReferenceAssets } from "@/features/ad-concepts/domain/asset-selection";
 import {
   getBrandProfile,
@@ -156,19 +162,18 @@ async function ConceptDetail({ conceptId }: { conceptId: string }) {
             <div className="flex flex-wrap items-center gap-2">
               {detail.strategy_type && (
                 <StatusBadge
-                  label={detail.strategy_type.replace(/_/g, " ")}
+                  label={labelFor(STRATEGY_LABELS, detail.strategy_type)}
                   tone="neutral"
                 />
               )}
               {detail.generation_status && (
                 <StatusBadge
-                  label={detail.generation_status.replace(/_/g, " ")}
+                  label={labelFor(
+                    GENERATION_STATUS_LABELS,
+                    detail.generation_status,
+                  )}
                   tone={
-                    detail.generation_status === "generated"
-                      ? "success"
-                      : detail.generation_status === "failed"
-                        ? "danger"
-                        : "muted"
+                    GENERATION_STATUS_TONES[detail.generation_status] ?? "muted"
                   }
                 />
               )}

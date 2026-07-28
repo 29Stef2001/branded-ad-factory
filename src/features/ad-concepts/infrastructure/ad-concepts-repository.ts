@@ -1463,3 +1463,78 @@ export async function listQaReviews(
     createdAt: row.created_at,
   }));
 }
+
+/**
+ * Deletes a concept and its stored image.
+ *
+ * creative_generations cascades from concept_id, so attempt history goes with
+ * it. The image is removed here because the database has no way to reach into
+ * Storage. Failure to remove the file is logged rather than thrown: the row is
+ * already gone, and surfacing it would leave the user staring at a concept they
+ * successfully deleted.
+ */
+export async function deleteConcept(id: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("ad_concepts")
+    .select("creative_image_path")
+    .eq("id", id)
+    .maybeSingle();
+
+  // .select() so a delete blocked by RLS comes back as zero rows rather than
+  // a silent success.
+  const { data: deleted, error } = await supabase
+    .from("ad_concepts")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (error) throw error;
+  if (!deleted || deleted.length === 0) {
+    throw new Error("Concept not found, or you do not have access to it.");
+  }
+
+  if (existing?.creative_image_path) {
+    const { error: storageError } = await supabase.storage
+      .from(CREATIVE_IMAGES_BUCKET)
+      .remove([existing.creative_image_path]);
+    if (storageError) {
+      console.error("Failed to remove creative image for deleted concept", {
+        id,
+        error: storageError,
+      });
+    }
+  }
+}
+
+/**
+ * Closes out generation attempts that were interrupted mid-flight.
+ *
+ * A crashed request, a dev-server restart or a serverless timeout leaves a row
+ * stuck in "generating" forever, which then shows up as in-progress work that
+ * will never finish. Ten minutes is well past the observed worst case of ~95s,
+ * so anything older is definitively dead rather than slow.
+ *
+ * Called opportunistically on dashboard load rather than by a scheduler: there
+ * is no job runner in this app, and a stale row is only misleading when
+ * somebody is looking at it.
+ */
+export async function failStaleGenerations(): Promise<number> {
+  const supabase = await createClient();
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("creative_generations")
+    .update({
+      status: "failed",
+      failure_reason:
+        "Interrupted — the request ended before generation finished.",
+    })
+    .in("status", ["generating", "qa_in_progress"])
+    .lt("created_at", cutoff)
+    .select("id");
+
+  if (error) throw error;
+  return data?.length ?? 0;
+}
