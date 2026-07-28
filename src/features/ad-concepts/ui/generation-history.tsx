@@ -56,8 +56,7 @@ export function GenerationHistory({
       {[...attempts]
         .sort((a, b) => b.attempt_number - a.attempt_number)
         .map((attempt) => {
-          const isLatestSuccess =
-            attempt.status === "generated" && attempt.image_path !== null;
+          const producedImage = attempt.image_path !== null;
 
           return (
             <div
@@ -74,8 +73,14 @@ export function GenerationHistory({
                 />
                 {attempt.qa_passed !== null && (
                   <StatusBadge
-                    label={attempt.qa_passed ? "QA passed" : "QA failed"}
-                    tone={attempt.qa_passed ? "success" : "warning"}
+                    label={
+                      attempt.qa_score !== null
+                        ? `QA ${attempt.qa_passed ? "pass" : "fail"} · ${attempt.qa_score}/10`
+                        : attempt.qa_passed
+                          ? "QA pass"
+                          : "QA fail"
+                    }
+                    tone={attempt.qa_passed ? "success" : "danger"}
                   />
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">
@@ -104,7 +109,38 @@ export function GenerationHistory({
                 </p>
               )}
 
-              {isLatestSuccess && imageUrl && (
+              {attempt.detected_issues.length > 0 && (
+                <ul className="flex flex-col gap-1">
+                  {attempt.detected_issues.map((issue) => (
+                    <li
+                      key={issue}
+                      className="flex gap-1.5 text-xs text-warning"
+                    >
+                      <span aria-hidden>•</span>
+                      <span>{issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {attempt.qa_suggested_prompt && (
+                <details className="rounded border border-border bg-background/60 px-2 py-1.5">
+                  <summary className="cursor-pointer text-xs font-medium">
+                    Suggested prompt fix
+                  </summary>
+                  <p className="mt-1.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                    {attempt.qa_suggested_prompt}
+                  </p>
+                </details>
+              )}
+
+              {attempt.reviewed_at && (
+                <p className="text-[11px] text-muted-foreground/70">
+                  Reviewed {formatTime(attempt.reviewed_at)}
+                </p>
+              )}
+
+              {producedImage && imageUrl && (
                 <div className="flex items-center gap-2">
                   {/* eslint-disable-next-line @next/next/no-img-element -- signed Storage URL */}
                   <img

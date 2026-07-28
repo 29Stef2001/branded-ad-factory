@@ -72,6 +72,10 @@ export type CreativeGenerationRow = {
   qa_scores: Record<string, number> | null;
   qa_passed: boolean | null;
   qa_notes: string | null;
+  qa_score: number | null;
+  detected_issues: string[];
+  qa_suggested_prompt: string | null;
+  reviewed_at: string | null;
   retry_reason: string | null;
   failure_reason: string | null;
   created_at: string;
@@ -1003,6 +1007,10 @@ export async function updateGenerationAttempt(
     qaScores?: Record<string, number>;
     qaPassed?: boolean;
     qaNotes?: string;
+    qaScore?: number;
+    detectedIssues?: string[];
+    qaSuggestedPrompt?: string;
+    reviewedAt?: string;
     failureReason?: string;
   },
 ): Promise<void> {
@@ -1015,6 +1023,14 @@ export async function updateGenerationAttempt(
       ...(input.qaScores !== undefined && { qa_scores: input.qaScores }),
       ...(input.qaPassed !== undefined && { qa_passed: input.qaPassed }),
       ...(input.qaNotes !== undefined && { qa_notes: input.qaNotes }),
+      ...(input.qaScore !== undefined && { qa_score: input.qaScore }),
+      ...(input.detectedIssues !== undefined && {
+        detected_issues: input.detectedIssues,
+      }),
+      ...(input.qaSuggestedPrompt !== undefined && {
+        qa_suggested_prompt: input.qaSuggestedPrompt,
+      }),
+      ...(input.reviewedAt !== undefined && { reviewed_at: input.reviewedAt }),
       ...(input.failureReason !== undefined && {
         failure_reason: input.failureReason,
       }),
@@ -1115,7 +1131,7 @@ export async function listGenerationsForConcept(
   const { data, error } = await supabase
     .from("creative_generations")
     .select(
-      "id, concept_id, attempt_number, status, image_path, selected_reference_roles, qa_scores, qa_passed, qa_notes, retry_reason, failure_reason, created_at",
+      "id, concept_id, attempt_number, status, image_path, selected_reference_roles, qa_scores, qa_passed, qa_notes, qa_score, detected_issues, qa_suggested_prompt, reviewed_at, retry_reason, failure_reason, created_at",
     )
     .eq("concept_id", conceptId)
     .order("attempt_number", { ascending: true });

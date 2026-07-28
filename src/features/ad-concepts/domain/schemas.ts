@@ -228,6 +228,32 @@ export const qaResultSchema = z.object({
   unapprovedMessageDetected: z.boolean(),
   textMisspelled: z.boolean(),
   seriousVisualArtifacts: z.boolean(),
+
+  // Added after two failures a human caught and the checks above could not:
+  // a male craftsman where the brand has a female owner, and Dutch signage for
+  // a US audience.
+  ownerReferenceProvided: z
+    .boolean()
+    .describe("Whether an owner reference image was supplied for this render"),
+  ownerMatchesReference: z
+    .boolean()
+    .describe(
+      "True when no owner reference was supplied, or when the person shown matches it in gender, age and appearance",
+    ),
+  allVisibleTextIsEnglish: z
+    .boolean()
+    .describe("False if any word in the image is not English"),
+
+  detectedIssues: z
+    .array(z.string())
+    .describe(
+      "One short sentence per concrete problem found, empty when there are none",
+    ),
+  suggestedPromptFix: z
+    .string()
+    .describe(
+      "When issues were found, a rewritten scene prompt that would avoid them. Empty string when nothing needs fixing.",
+    ),
   notes: z
     .string()
     .describe("A short human-readable summary of any issues found"),

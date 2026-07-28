@@ -134,7 +134,7 @@ export const NAV_TREE: NavEntry[] = [
         segment: "creative-studio/image-qa",
         status: "soon",
         blurb:
-          "Review generated creative for product accuracy, branding and artefacts.",
+          "QA already runs automatically on every generated image — scores, issues and a suggested prompt fix appear under each attempt in Prompt Builder. What is not built is this standalone review queue for triaging everything that needs review in one place.",
       },
     ],
   },

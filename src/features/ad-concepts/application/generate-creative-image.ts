@@ -8,6 +8,8 @@ import {
 } from "@/features/ad-concepts/domain/schemas";
 import { selectReferenceAssets } from "@/features/ad-concepts/domain/asset-selection";
 import { toUserFacingError } from "@/features/ad-concepts/domain/generation-errors";
+import { evaluateQa } from "@/features/ad-concepts/domain/qa-evaluation";
+import { runImageQa } from "@/features/ad-concepts/infrastructure/qa-client";
 import {
   fetchExternalImage,
   generateConceptImage,
@@ -22,6 +24,7 @@ import {
   getConceptForGeneration,
   insertGenerationAttempt,
   listBrandAssets,
+  listEnabledApprovedMessages,
   setConceptImagePath,
   setConceptProductImageUrl,
   updateConceptGenerationStatus,
@@ -232,11 +235,77 @@ export async function generateCreativeImageAction(
       status: "generated",
       imagePath: path,
     });
-    await updateConceptGenerationStatus(
-      conceptId,
-      "generated",
-      attemptNumber - 1,
-    );
+
+    // QA runs after the image is stored, never before: a review failure must
+    // not cost the render. Its own errors are caught separately below for the
+    // same reason.
+    await updateGenerationAttempt(attemptId, { status: "qa_in_progress" });
+
+    try {
+      const approvedMessages = await listEnabledApprovedMessages();
+      const qa = await runImageQa({
+        brandName: brandProfile.brand_name,
+        scenePrompt: concept.finalGenerationPrompt,
+        approvedMessage: concept.promotionalMessage,
+        allApprovedMessages: approvedMessages.map((m) => m.message),
+        generatedImage: { buffer: image, contentType: "image/png" },
+        references: references.map((reference) => ({
+          role: reference.role,
+          label: reference.label,
+          buffer: reference.image.buffer,
+          contentType: reference.image.contentType,
+        })),
+      });
+
+      const verdict = evaluateQa(qa);
+
+      console.log(
+        "Image QA",
+        JSON.stringify(
+          {
+            conceptId,
+            attemptId,
+            score: verdict.score,
+            passed: verdict.passed,
+            hardFailures: verdict.hardFailureKeys,
+            issues: verdict.issues,
+            scores: qa.scores,
+          },
+          null,
+          2,
+        ),
+      );
+
+      await updateGenerationAttempt(attemptId, {
+        status: verdict.passed ? "approved" : "needs_review",
+        qaScores: qa.scores,
+        qaPassed: verdict.passed,
+        qaScore: verdict.score,
+        qaNotes: qa.notes,
+        detectedIssues: verdict.issues,
+        qaSuggestedPrompt: qa.suggestedPromptFix || undefined,
+        reviewedAt: new Date().toISOString(),
+      });
+      await updateConceptGenerationStatus(
+        conceptId,
+        verdict.passed ? "approved" : "needs_review",
+        attemptNumber - 1,
+      );
+    } catch (qaError) {
+      // The image is already saved and usable; only the verdict is missing.
+      // Recorded as generated-but-unreviewed rather than failed, so a QA outage
+      // never looks like a generation outage.
+      console.error("Image QA failed", { conceptId, attemptId, qaError });
+      await updateGenerationAttempt(attemptId, {
+        status: "generated",
+        qaNotes: `QA could not run: ${toUserFacingError(qaError).message}`,
+      });
+      await updateConceptGenerationStatus(
+        conceptId,
+        "generated",
+        attemptNumber - 1,
+      );
+    }
   } catch (error) {
     // The raw error goes to the logs and to the attempt row; the user gets a
     // translation. Provider payloads are not readable and leak internals.
