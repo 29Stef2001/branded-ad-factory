@@ -3,6 +3,7 @@ import {
   renderBrandHeadline,
   renderBrandStyle,
   renderLanguageRule,
+  renderRules,
   type BrandContext,
 } from "@/features/ad-concepts/domain/brand-context";
 import { env } from "@/lib/env";
@@ -140,6 +141,9 @@ function buildPrompt(
   const style = renderBrandStyle(input.brand);
   if (style) sections.push(style);
 
+  const rules = renderRules(input.brand, "image");
+  if (rules) sections.push(rules);
+
   sections.push(`Scene: ${input.scenePrompt}`);
 
   if (input.overflowNotes?.length) {
@@ -170,7 +174,7 @@ function buildPrompt(
   // The store sells to a US audience, so any lettering the model does render —
   // signage, packaging, a price card — has to be English. Stated last so it
   // reads as an overriding rule rather than one detail among many.
-  sections.push(renderLanguageRule("image"));
+  sections.push(renderLanguageRule(input.brand, "image"));
 
   return sections.join("\n\n").trim();
 }

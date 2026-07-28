@@ -25,21 +25,142 @@ export const foilStyleEnum = z.enum([
   "custom",
 ]);
 
+// Fixed vocabularies, mirroring the CHECK constraints on brand_profiles so an
+// invalid value fails at compile time rather than as a 23514 from Postgres.
+export const writingStyleEnum = z.enum([
+  "direct_response",
+  "conversational",
+  "editorial",
+  "minimal",
+  "storytelling",
+]);
+
+export const photographyStyleEnum = z.enum([
+  "documentary",
+  "ugc",
+  "studio",
+  "editorial",
+  "lifestyle",
+  "flat_lay",
+]);
+
+export const founderGenderEnum = z.enum([
+  "female",
+  "male",
+  "non_binary",
+  "unspecified",
+]);
+
+export const pricePositioningEnum = z.enum([
+  "budget",
+  "mid_market",
+  "premium",
+  "luxury",
+]);
+
+/**
+ * One entry per line. Used where entries are sentences rather than words — a
+ * USP like "Worn for decades, not seasons" contains a comma, so splitting on
+ * commas would silently cut one claim into two.
+ */
+const lineList = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) =>
+    value
+      ? [
+          ...new Set(
+            value
+              .split("\n")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          ),
+        ]
+      : [],
+  );
+
+/** Comma-separated in the UI, an array in the database. For short values. */
+const tagList = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) =>
+    value
+      ? [
+          ...new Set(
+            value
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean),
+          ),
+        ]
+      : [],
+  );
+
 export const brandProfileSchema = z.object({
+  // ── Identity ────────────────────────────────────────────────────────────
   brandName: z.string().min(1, "Brand name is required"),
-  industry: z.string().min(1, "Industry is required"),
-  tone: z.string().min(1, "Tone is required"),
+  brandCategory: z.string().min(1, "Brand category is required"),
+  markets: tagList,
+  languages: tagList,
+  brandStory: z.string().trim().optional(),
+  brandMission: z.string().trim().optional(),
+
+  // ── Audience & voice ────────────────────────────────────────────────────
   targetAudience: z.string().min(1, "Target audience is required"),
-  uniqueSellingPoints: z.string().min(1, "Unique selling points are required"),
-  // Optional, unlike the fields above: its absence only means generated images
-  // fall back to an invented emblem instead of the real logo, not degraded copy.
-  logoImageUrl: z.string().trim().url("Enter a valid URL").optional(),
+  toneAttributes: tagList,
+  toneNotes: z.string().trim().optional(),
+  writingStyle: writingStyleEnum.optional(),
+
+  // ── Visual ──────────────────────────────────────────────────────────────
+  visualStyle: z.string().trim().optional(),
+  photographyStyle: photographyStyleEnum.optional(),
   brandColors: brandColorsSchema.optional(),
   typographyNotes: z.string().trim().min(1).optional(),
+  logoRules: z.string().trim().optional(),
   embossStyle: embossStyleEnum.optional(),
   embossCustomNotes: z.string().trim().min(1).optional(),
   foilStyle: foilStyleEnum.optional(),
   foilCustomNotes: z.string().trim().min(1).optional(),
+  // Kept as the fallback logo source for brands that never moved to Brand
+  // Assets. The founder's photo deliberately has no field here — it lives in
+  // Brand Assets as an "owner" asset.
+  logoImageUrl: z.string().trim().url("Enter a valid URL").optional(),
+
+  // ── Founder ─────────────────────────────────────────────────────────────
+  founderName: z.string().trim().optional(),
+  founderGender: founderGenderEnum.optional(),
+  founderAge: z.coerce
+    .number()
+    .int()
+    .min(16)
+    .max(120)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  founderBackground: z.string().trim().optional(),
+
+  // ── Commercial ──────────────────────────────────────────────────────────
+  productPositioning: z.string().trim().optional(),
+  pricePositioning: pricePositioningEnum.optional(),
+  materials: tagList,
+  usps: lineList,
+  brandValues: tagList,
+
+  // ── Language rules ──────────────────────────────────────────────────────
+  wordsToAlwaysUse: tagList,
+  wordsToNeverUse: tagList,
+
+  // ── Generation rules ────────────────────────────────────────────────────
+  imageGenerationRules: z.string().trim().optional(),
+  copyGenerationRules: z.string().trim().optional(),
+  qaExpectations: z.string().trim().optional(),
+  qaMinScore: z.coerce
+    .number()
+    .min(0)
+    .max(10)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
 /**
@@ -265,4 +386,8 @@ export type ConceptV2 = z.infer<typeof conceptV2Schema>;
 export type ConceptsOutputV2 = z.infer<typeof conceptsOutputSchemaV2>;
 export type QaResult = z.infer<typeof qaResultSchema>;
 export type BrandAssetType = z.infer<typeof brandAssetTypeEnum>;
+export type WritingStyle = z.infer<typeof writingStyleEnum>;
+export type PhotographyStyle = z.infer<typeof photographyStyleEnum>;
+export type FounderGender = z.infer<typeof founderGenderEnum>;
+export type PricePositioning = z.infer<typeof pricePositioningEnum>;
 export type StrategyType = z.infer<typeof strategyTypeEnum>;

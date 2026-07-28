@@ -13,19 +13,61 @@ export type BrandColors = {
   background?: string;
 };
 
+/**
+ * Bumped whenever the shape of Brand DNA changes, so a later migration can
+ * find rows written against an older shape rather than inferring it.
+ */
+export const BRAND_PROFILE_SCHEMA_VERSION = 1;
+
 export type BrandProfile = {
+  schema_version: number;
+  updated_by: string | null;
+  updated_at: string;
+  migration_source: string | null;
+  /** Experimental values. Never rendered into a prompt — see brand-context.ts. */
+  metadata: Record<string, unknown>;
+
   brand_name: string;
-  industry: string;
-  tone: string;
+  brand_category: string | null;
+  markets: string[];
+  languages: string[];
+  brand_story: string | null;
+  brand_mission: string | null;
+
   target_audience: string;
-  unique_selling_points: string;
-  logo_image_url: string | null;
+  tone_attributes: string[];
+  tone_notes: string | null;
+  writing_style: string | null;
+
+  visual_style: string | null;
+  photography_style: string | null;
   brand_colors: BrandColors | null;
   typography_notes: string | null;
+  logo_rules: string | null;
   emboss_style: string | null;
   emboss_custom_notes: string | null;
   foil_style: string | null;
   foil_custom_notes: string | null;
+  logo_image_url: string | null;
+
+  founder_name: string | null;
+  founder_gender: string | null;
+  founder_age: number | null;
+  founder_background: string | null;
+
+  product_positioning: string | null;
+  price_positioning: string | null;
+  materials: string[];
+  usps: string[];
+  brand_values: string[];
+
+  words_to_always_use: string[];
+  words_to_never_use: string[];
+
+  image_generation_rules: string | null;
+  copy_generation_rules: string | null;
+  qa_expectations: string | null;
+  qa_min_score: number | null;
 };
 
 export type BrandAssetRow = {
@@ -115,7 +157,7 @@ export async function getBrandProfile(): Promise<BrandProfile | null> {
   const { data, error } = await supabase
     .from("brand_profiles")
     .select(
-      "brand_name, industry, tone, target_audience, unique_selling_points, logo_image_url, brand_colors, typography_notes, emboss_style, emboss_custom_notes, foil_style, foil_custom_notes",
+      "schema_version, updated_by, updated_at, migration_source, metadata, brand_name, brand_category, markets, languages, brand_story, brand_mission, target_audience, tone_attributes, tone_notes, writing_style, visual_style, photography_style, brand_colors, typography_notes, logo_rules, emboss_style, emboss_custom_notes, foil_style, foil_custom_notes, logo_image_url, founder_name, founder_gender, founder_age, founder_background, product_positioning, price_positioning, materials, usps, brand_values, words_to_always_use, words_to_never_use, image_generation_rules, copy_generation_rules, qa_expectations, qa_min_score",
     )
     .maybeSingle();
 
@@ -134,39 +176,91 @@ async function getBrandProfileId(): Promise<string | null> {
   return data?.id ?? null;
 }
 
+export type BrandProfileInput = {
+  brandName: string;
+  brandCategory: string;
+  markets: string[];
+  languages: string[];
+  brandStory?: string;
+  brandMission?: string;
+  targetAudience: string;
+  toneAttributes: string[];
+  toneNotes?: string;
+  writingStyle?: string;
+  visualStyle?: string;
+  photographyStyle?: string;
+  brandColors?: BrandColors;
+  typographyNotes?: string;
+  logoRules?: string;
+  embossStyle?: string;
+  embossCustomNotes?: string;
+  foilStyle?: string;
+  foilCustomNotes?: string;
+  logoImageUrl?: string;
+  founderName?: string;
+  founderGender?: string;
+  founderAge?: number;
+  founderBackground?: string;
+  productPositioning?: string;
+  pricePositioning?: string;
+  materials: string[];
+  usps: string[];
+  brandValues: string[];
+  wordsToAlwaysUse: string[];
+  wordsToNeverUse: string[];
+  imageGenerationRules?: string;
+  copyGenerationRules?: string;
+  qaExpectations?: string;
+  qaMinScore?: number;
+};
+
 export async function upsertBrandProfile(
   userId: string,
-  profile: {
-    brandName: string;
-    industry: string;
-    tone: string;
-    targetAudience: string;
-    uniqueSellingPoints: string;
-    logoImageUrl?: string;
-    brandColors?: BrandColors;
-    typographyNotes?: string;
-    embossStyle?: string;
-    embossCustomNotes?: string;
-    foilStyle?: string;
-    foilCustomNotes?: string;
-  },
+  profile: BrandProfileInput,
 ) {
   const supabase = await createClient();
   const { error } = await supabase.from("brand_profiles").upsert(
     {
       user_id: userId,
+      schema_version: BRAND_PROFILE_SCHEMA_VERSION,
+      updated_by: userId,
+      // A human just saved this, so it is no longer an unreviewed backfill.
+      migration_source: "form",
       brand_name: profile.brandName,
-      industry: profile.industry,
-      tone: profile.tone,
+      brand_category: profile.brandCategory,
+      markets: profile.markets,
+      languages: profile.languages,
+      brand_story: profile.brandStory ?? null,
+      brand_mission: profile.brandMission ?? null,
       target_audience: profile.targetAudience,
-      unique_selling_points: profile.uniqueSellingPoints,
-      logo_image_url: profile.logoImageUrl ?? null,
+      tone_attributes: profile.toneAttributes,
+      tone_notes: profile.toneNotes ?? null,
+      writing_style: profile.writingStyle ?? null,
+      visual_style: profile.visualStyle ?? null,
+      photography_style: profile.photographyStyle ?? null,
       brand_colors: profile.brandColors ?? null,
       typography_notes: profile.typographyNotes ?? null,
+      logo_rules: profile.logoRules ?? null,
       emboss_style: profile.embossStyle ?? "none",
       emboss_custom_notes: profile.embossCustomNotes ?? null,
       foil_style: profile.foilStyle ?? "none",
       foil_custom_notes: profile.foilCustomNotes ?? null,
+      logo_image_url: profile.logoImageUrl ?? null,
+      founder_name: profile.founderName ?? null,
+      founder_gender: profile.founderGender ?? null,
+      founder_age: profile.founderAge ?? null,
+      founder_background: profile.founderBackground ?? null,
+      product_positioning: profile.productPositioning ?? null,
+      price_positioning: profile.pricePositioning ?? null,
+      materials: profile.materials,
+      usps: profile.usps,
+      brand_values: profile.brandValues,
+      words_to_always_use: profile.wordsToAlwaysUse,
+      words_to_never_use: profile.wordsToNeverUse,
+      image_generation_rules: profile.imageGenerationRules ?? null,
+      copy_generation_rules: profile.copyGenerationRules ?? null,
+      qa_expectations: profile.qaExpectations ?? null,
+      qa_min_score: profile.qaMinScore ?? null,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },

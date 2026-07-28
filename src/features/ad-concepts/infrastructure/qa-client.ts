@@ -8,6 +8,7 @@ import {
   renderBrandHeadline,
   renderBrandStyle,
   renderLanguageRule,
+  renderRules,
   type BrandContext,
 } from "@/features/ad-concepts/domain/brand-context";
 import { env } from "@/lib/env";
@@ -95,6 +96,8 @@ export async function runImageQa(input: QaInput): Promise<QaResult> {
 
 ${renderBrandStyle(input.brand)}
 
+${renderRules(input.brand, "qa")}
+
 The image was generated from this scene prompt:
 """
 ${input.scenePrompt}
@@ -114,7 +117,7 @@ Judge specifically:
 - Does the product shown match the product reference exactly — shape, material, finish, patina? Report productMaterialChanged if copper has become gold, matte has become glossy, and so on.
 - Is the logo reproduced exactly, not redrawn or restyled?
 - If an owner reference is supplied, is the person shown the same person — same gender, roughly the same age and build? Set ownerReferenceProvided accordingly, and set ownerMatchesReference to true when no owner reference was given.
-- ${renderLanguageRule("image")} Judge allVisibleTextIsEnglish against that rule.
+- ${renderLanguageRule(input.brand, "image")} Judge allVisibleTextIsEnglish against that rule.
 - Are there spelling mistakes in any visible text?
 - Are there AI artifacts a viewer would notice — malformed hands, extra fingers, warped edges, nonsense lettering?
 - Does the composition actually follow the scene prompt?

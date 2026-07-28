@@ -258,7 +258,7 @@ export async function generateCreativeImageAction(
         })),
       });
 
-      const verdict = evaluateQa(qa);
+      const verdict = evaluateQa(qa, brandContext.qaMinScore);
 
       console.log(
         "Image QA",

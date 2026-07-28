@@ -10,7 +10,9 @@ import {
   renderBrandHeadline,
   renderBrandIdentity,
   renderBrandStyle,
+  renderFounder,
   renderLanguageRule,
+  renderRules,
   type BrandContext,
 } from "@/features/ad-concepts/domain/brand-context";
 import { env } from "@/lib/env";
@@ -103,10 +105,15 @@ export async function generateConcepts(
         role: "user",
         content: `You are a senior direct-response creative strategist producing realistic, high-converting ad concepts — the kind that win on Facebook and Instagram through authenticity, urgency, and documentary-style realism, not polished studio advertising.
 
-${renderLanguageRule("copy")}
+${renderLanguageRule(brand, "copy")}
 
 ${renderBrandIdentity(brand)}
-${renderBrandStyle(brand)}${formatAvailableAssets(available)}
+
+${renderBrandStyle(brand)}
+
+${renderFounder(brand)}
+
+${renderRules(brand, "copy")}${formatAvailableAssets(available)}
 
 Campaign brief: ${brief}${inspirationBlock}
 

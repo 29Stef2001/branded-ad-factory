@@ -97,7 +97,11 @@ export type QaVerdict = {
   hardFailureKeys: string[];
 };
 
-export function evaluateQa(qa: QaResult): QaVerdict {
+export function evaluateQa(
+  qa: QaResult,
+  /** Brand-level override from the profile; falls back to the shared bar. */
+  minScore?: number | null,
+): QaVerdict {
   const entries = Object.entries(SCORE_WEIGHTS) as [
     keyof QaResult["scores"],
     number,
@@ -122,7 +126,7 @@ export function evaluateQa(qa: QaResult): QaVerdict {
 
   return {
     score,
-    passed: triggered.length === 0 && score >= QA_PASS_THRESHOLD,
+    passed: triggered.length === 0 && score >= (minScore ?? QA_PASS_THRESHOLD),
     issues,
     hardFailureKeys: triggered.map((failure) => failure.key),
   };
