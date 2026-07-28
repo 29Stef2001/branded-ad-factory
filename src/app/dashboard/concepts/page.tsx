@@ -12,12 +12,10 @@ import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-com
 import { buttonVariants } from "@/components/ui/button";
 import { GenerateConceptsForm } from "@/features/ad-concepts/ui/generate-concepts-form";
 import { ConceptCard } from "@/features/ad-concepts/ui/concept-card";
-import { ApprovedMessagesManager } from "@/features/ad-concepts/ui/approved-messages-manager";
 import {
   getBrandProfile,
   getSignedImageUrls,
   listAnalyzedAdsForInspiration,
-  listApprovedMessages,
   listConcepts,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
@@ -33,13 +31,11 @@ export const metadata: Metadata = {
 export const maxDuration = 300;
 
 export default async function ConceptsPage() {
-  const [brandProfile, inspirationOptions, concepts, approvedMessages] =
-    await Promise.all([
-      getBrandProfile(),
-      listAnalyzedAdsForInspiration(),
-      listConcepts(),
-      listApprovedMessages(),
-    ]);
+  const [brandProfile, inspirationOptions, concepts] = await Promise.all([
+    getBrandProfile(),
+    listAnalyzedAdsForInspiration(),
+    listConcepts(),
+  ]);
 
   const completeness = assessBrandCompleteness(brandProfile);
 
@@ -104,7 +100,6 @@ export default async function ConceptsPage() {
                   </Link>
                 }
               />
-              <ApprovedMessagesManager messages={approvedMessages} />
             </>
           )}
         </div>

@@ -1,14 +1,4 @@
-import {
-  Bot,
-  BookOpen,
-  ChartLine,
-  Factory,
-  House,
-  Palette,
-  Settings,
-  TrendingUp,
-  type LucideIcon,
-} from "lucide-react";
+import { House, TrendingUp, Workflow, type LucideIcon } from "lucide-react";
 
 /**
  * "live" items route to a page backed by real data and real server actions.
@@ -44,85 +34,33 @@ export function isGroup(entry: NavEntry): entry is NavGroup {
  * mobile drawer, and the /dashboard/[...slug] placeholder route all read this
  * tree, so a route exists if and only if it is listed here.
  *
- * Live entries keep the paths they already have — routes are not being moved.
- * Unbuilt entries are nested under their group (e.g. /dashboard/ad-factory/
- * campaigns), which both reads better and keeps Knowledge's "Competitors" from
- * colliding with the existing /dashboard/competitors page.
+ * Only production-ready pages appear. Modules without a working backend are
+ * deliberately absent rather than shown as "soon": a navigation full of dead
+ * ends reads as a roadmap, and a user cannot tell which half of it is real.
+ * They return here when they are built.
  */
 export const NAV_TREE: NavEntry[] = [
   { label: "Dashboard", segment: "", icon: House, status: "live" },
   {
-    label: "Analytics",
-    segment: "analytics",
-    icon: ChartLine,
-    status: "soon",
-    blurb:
-      "Cross-brand reporting over concepts, spend and creative performance.",
-  },
-  {
-    label: "AI Agents",
-    icon: Bot,
-    items: [
-      // Not in the requested list, but /dashboard/agents already exists and
-      // works; without an entry it would be unreachable from the sidebar.
-      { label: "All Agents", segment: "agents", status: "live" },
-      {
-        label: "Competitor Intelligence",
-        segment: "competitors",
-        status: "live",
-      },
-      {
-        label: "Ad Intelligence",
-        segment: "agents/ad-intelligence",
-        status: "soon",
-        blurb:
-          "Aggregate patterns across analyzed ads — angles, offers and formats that recur.",
-      },
-      {
-        label: "Creative Intelligence",
-        segment: "agents/creative-intelligence",
-        status: "soon",
-        blurb:
-          "Reads creative performance to explain which executions work and why.",
-      },
-      {
-        label: "Media Buyer",
-        segment: "agents/media-buyer",
-        status: "soon",
-        blurb: "Budget, bidding and scaling decisions across ad accounts.",
-      },
-      {
-        label: "Compliance",
-        segment: "agents/compliance",
-        status: "soon",
-        blurb: "Screens creative against ad-platform policy before launch.",
-      },
-      {
-        label: "Research",
-        segment: "agents/research",
-        status: "soon",
-        blurb: "Market, audience and category research workspace.",
-      },
-    ],
-  },
-  {
-    label: "Creative Studio",
-    icon: Palette,
+    // Ordered as the work is actually done, not by subject. A first-time user
+    // who follows this list top to bottom cannot hit a blocked step: messages
+    // sit above Concepts because concept generation refuses to run without an
+    // enabled one, which their own ordering would only reveal on failure.
+    label: "Workflow",
+    icon: Workflow,
     items: [
       { label: "Brand Profile", segment: "brand-profile", status: "live" },
-      { label: "Concepts", segment: "concepts", status: "live" },
       {
         label: "Brand Assets",
         segment: "creative-studio/brand-assets",
         status: "live",
       },
       {
-        label: "Image Generator",
-        segment: "creative-studio/image-generator",
-        status: "soon",
-        blurb:
-          "A standalone home for image generation, which currently runs per-concept on the Concepts page.",
+        label: "Promotional Messages",
+        segment: "promotional-messages",
+        status: "live",
       },
+      { label: "Concepts", segment: "concepts", status: "live" },
       {
         label: "Prompt Builder",
         segment: "creative-studio/prompt-builder",
@@ -131,132 +69,26 @@ export const NAV_TREE: NavEntry[] = [
       {
         label: "Image QA",
         segment: "creative-studio/image-qa",
-        status: "soon",
-        blurb:
-          "QA already runs automatically on every generated image — scores, issues and a suggested prompt fix appear under each attempt in Prompt Builder. What is not built is this standalone review queue for triaging everything that needs review in one place.",
-      },
-    ],
-  },
-  {
-    label: "Ad Factory",
-    icon: Factory,
-    items: [
-      {
-        label: "Campaigns",
-        segment: "ad-factory/campaigns",
-        status: "soon",
-        blurb: "Campaign briefs and their generated output.",
-      },
-      {
-        label: "Variants",
-        segment: "ad-factory/variants",
-        status: "soon",
-        blurb: "Individual ad variants produced from a campaign brief.",
-      },
-      {
-        label: "Batches",
-        segment: "ad-factory/batches",
-        status: "soon",
-        blurb: "Batch generation runs and their status.",
+        status: "live",
       },
       {
         label: "Launch in Meta",
         segment: "ad-factory/launch",
         status: "live",
       },
-      {
-        label: "Winning Ads",
-        segment: "ad-factory/winning-ads",
-        status: "soon",
-        blurb: "Top performers promoted out of batch results.",
-      },
     ],
   },
   {
-    label: "Performance",
+    label: "Insights",
     icon: TrendingUp,
     items: [
-      // The existing Meta ad account insights page.
+      { label: "All Agents", segment: "agents", status: "live" },
+      {
+        label: "Competitor Intelligence",
+        segment: "competitors",
+        status: "live",
+      },
       { label: "Meta Ad Account", segment: "performance", status: "live" },
-      {
-        label: "ROAS",
-        segment: "performance/roas",
-        status: "soon",
-        blurb: "Return on ad spend by campaign, batch and creative.",
-      },
-      {
-        label: "Creative Fatigue",
-        segment: "performance/creative-fatigue",
-        status: "soon",
-        blurb: "Detects declining creative performance before it wastes spend.",
-      },
-      {
-        label: "Attribution",
-        segment: "performance/attribution",
-        status: "soon",
-        blurb: "Attribution modelling across touchpoints.",
-      },
-      {
-        label: "LTV",
-        segment: "performance/ltv",
-        status: "soon",
-        blurb: "Lifetime-value reporting by acquisition cohort.",
-      },
-    ],
-  },
-  {
-    label: "Knowledge",
-    icon: BookOpen,
-    items: [
-      {
-        label: "Learnings",
-        segment: "knowledge/learnings",
-        status: "soon",
-        blurb: "What worked and what didn't, captured as reusable learnings.",
-      },
-      {
-        label: "Swipe Files",
-        segment: "knowledge/swipe-files",
-        status: "soon",
-        blurb: "Saved reference ads and inspiration, organised by angle.",
-      },
-      {
-        label: "Competitors",
-        segment: "knowledge/competitors",
-        status: "soon",
-        blurb:
-          "Reference profiles per competitor. Live competitor ad analysis is under AI Agents → Competitor Intelligence.",
-      },
-    ],
-  },
-  {
-    label: "Operations",
-    icon: Settings,
-    items: [
-      {
-        label: "Tasks",
-        segment: "operations/tasks",
-        status: "soon",
-        blurb: "Queued and running work across the pipeline.",
-      },
-      {
-        label: "Costs",
-        segment: "operations/costs",
-        status: "soon",
-        blurb: "Model and API spend per feature.",
-      },
-      {
-        label: "Roadmap",
-        segment: "operations/roadmap",
-        status: "soon",
-        blurb: "What is shipped, in progress and planned.",
-      },
-      {
-        label: "Settings",
-        segment: "operations/settings",
-        status: "soon",
-        blurb: "Workspace and integration settings.",
-      },
     ],
   },
 ];

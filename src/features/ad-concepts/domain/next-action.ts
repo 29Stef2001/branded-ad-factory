@@ -47,7 +47,7 @@ export function recommendNextAction(input: NextActionInput): NextAction {
       title: "Enable at least one promotional message",
       reason:
         "Concept generation refuses to run without one, because every concept must use approved wording.",
-      href: "/dashboard/concepts",
+      href: "/dashboard/promotional-messages",
       cta: "Manage messages",
       severity: "blocking",
     };
@@ -111,8 +111,8 @@ export function recommendNextAction(input: NextActionInput): NextAction {
     return {
       title: `Review ${input.qaFailed} image${input.qaFailed === 1 ? "" : "s"} that failed QA`,
       reason: "Each one has a suggested prompt fix waiting in Prompt Builder.",
-      href: "/dashboard/creative-studio/prompt-builder",
-      cta: "Open Prompt Builder",
+      href: "/dashboard/creative-studio/image-qa?filter=failed",
+      cta: "Review failures",
       severity: "important",
     };
   }

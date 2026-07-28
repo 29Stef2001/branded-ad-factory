@@ -15,6 +15,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { BrandCompletenessPanel } from "@/features/ad-concepts/ui/brand-completeness-panel";
 import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
 import { recommendNextAction } from "@/features/ad-concepts/domain/next-action";
+import { buildWorkflow } from "@/features/ad-concepts/domain/workflow";
+import { WorkflowProgress } from "@/features/ad-concepts/ui/workflow-progress";
+import { getLaunchStatus } from "@/features/ad-launch/application/get-launch-status";
 import {
   getBrandProfile,
   getDashboardStats,
@@ -42,10 +45,11 @@ function timeAgo(iso: string): string {
 }
 
 export default async function DashboardPage() {
-  const [profile, stats, activity] = await Promise.all([
+  const [profile, stats, activity, launchStatus] = await Promise.all([
     getBrandProfile(),
     getDashboardStats(),
     listRecentActivity(),
+    getLaunchStatus(),
   ]);
 
   const completeness = assessBrandCompleteness(profile);
@@ -59,6 +63,21 @@ export default async function DashboardPage() {
     conceptsTotal: stats.conceptsTotal,
     conceptsWithImage: stats.conceptsWithImage,
     qaFailed: stats.qaFailed,
+  });
+
+  const workflow = buildWorkflow({
+    hasProfile: profile !== null,
+    completenessScore: completeness.score,
+    hasOwnerAsset: stats.hasOwnerAsset,
+    hasProductAsset: stats.hasProductAsset,
+    hasLogoAsset: stats.hasLogoAsset,
+    assetsActive: stats.assetsActive,
+    messagesEnabled: stats.messagesEnabled,
+    conceptsTotal: stats.conceptsTotal,
+    conceptsWithImage: stats.conceptsWithImage,
+    qaReviewed: stats.qaPassed + stats.qaFailed,
+    qaFailed: stats.qaFailed,
+    metaCanLaunch: launchStatus.state === "ready",
   });
 
   const missingAssetTypes = [
@@ -106,6 +125,8 @@ export default async function DashboardPage() {
         </Link>
       </DarkPanel>
 
+      <WorkflowProgress steps={workflow} />
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Brand profile"
@@ -139,7 +160,7 @@ export default async function DashboardPage() {
           value={stats.messagesEnabled}
           sub={`${stats.messagesTotal} total, ${stats.messagesTotal - stats.messagesEnabled} disabled`}
           icon={MessageSquare}
-          href="/dashboard/concepts"
+          href="/dashboard/promotional-messages"
           tone={stats.messagesEnabled === 0 ? "danger" : "default"}
         />
       </div>

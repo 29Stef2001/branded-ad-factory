@@ -1387,3 +1387,79 @@ export async function listRecentActivity(limit = 8): Promise<ActivityItem[]> {
     conceptHeadline: row.ad_concepts?.headline ?? "Deleted concept",
   }));
 }
+
+export type QaReviewItem = {
+  id: string;
+  conceptId: string;
+  conceptHeadline: string;
+  attemptNumber: number;
+  status: string;
+  qaScore: number | null;
+  qaPassed: boolean | null;
+  qaNotes: string | null;
+  detectedIssues: string[];
+  suggestedPrompt: string | null;
+  imagePath: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+/**
+ * Reviewed attempts across every concept, newest first.
+ *
+ * Exists because QA results were only visible one concept at a time: with
+ * fifteen concepts there was no way to see what needed attention without
+ * opening each in turn.
+ */
+export async function listQaReviews(
+  filter: "all" | "failed" | "passed" = "all",
+): Promise<QaReviewItem[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("creative_generations")
+    .select(
+      "id, concept_id, attempt_number, status, qa_score, qa_passed, qa_notes, detected_issues, qa_suggested_prompt, image_path, reviewed_at, created_at, ad_concepts(headline)",
+    )
+    .not("qa_passed", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (filter === "failed") query = query.eq("qa_passed", false);
+  if (filter === "passed") query = query.eq("qa_passed", true);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (
+    data as unknown as Array<{
+      id: string;
+      concept_id: string;
+      attempt_number: number;
+      status: string;
+      qa_score: number | null;
+      qa_passed: boolean | null;
+      qa_notes: string | null;
+      detected_issues: string[];
+      qa_suggested_prompt: string | null;
+      image_path: string | null;
+      reviewed_at: string | null;
+      created_at: string;
+      ad_concepts: { headline: string } | null;
+    }>
+  ).map((row) => ({
+    id: row.id,
+    conceptId: row.concept_id,
+    conceptHeadline: row.ad_concepts?.headline ?? "Deleted concept",
+    attemptNumber: row.attempt_number,
+    status: row.status,
+    qaScore: row.qa_score,
+    qaPassed: row.qa_passed,
+    qaNotes: row.qa_notes,
+    detectedIssues: row.detected_issues ?? [],
+    suggestedPrompt: row.qa_suggested_prompt,
+    imagePath: row.image_path,
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  }));
+}
