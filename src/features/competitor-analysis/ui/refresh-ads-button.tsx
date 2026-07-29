@@ -21,7 +21,7 @@ export function RefreshAdsButton({ competitorId }: { competitorId: string }) {
         </Alert>
       )}
       <Button type="submit" disabled={isPending} size="sm" variant="outline">
-        {isPending ? "Refreshing..." : "Refresh ads"}
+        {isPending ? "Refreshing…" : "Refresh ads"}
       </Button>
     </form>
   );

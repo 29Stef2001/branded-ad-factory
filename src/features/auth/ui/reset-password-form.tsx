@@ -57,7 +57,7 @@ export function ResetPasswordForm() {
       </div>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? "Updating password..." : "Update password"}
+        {isPending ? "Updating password…" : "Update password"}
       </Button>
     </form>
   );

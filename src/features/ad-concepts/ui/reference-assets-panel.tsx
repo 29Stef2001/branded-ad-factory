@@ -1,8 +1,10 @@
 import { ImageOff } from "lucide-react";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
-import { ASSET_TYPE_LABELS } from "@/features/ad-concepts/ui/brand-assets-manager";
-import type { BrandAssetType } from "@/features/ad-concepts/domain/schemas";
+import {
+  ASSET_ROLE_LABELS,
+  labelFor,
+} from "@/features/ad-concepts/domain/labels";
 import type { BrandAssetWithUrl } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 export type ResolvedReference = {
@@ -65,8 +67,7 @@ export function ReferenceAssetsPanel({
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">
-                {ASSET_TYPE_LABELS[reference.role as BrandAssetType] ??
-                  reference.role}
+                {labelFor(ASSET_ROLE_LABELS, reference.role) || reference.role}
               </span>
               {reference.asset?.is_primary && (
                 <StatusBadge label="Primary" tone="accent" />

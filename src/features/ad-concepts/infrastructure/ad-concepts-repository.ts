@@ -724,18 +724,6 @@ export async function removeBrandAssetFile(path: string): Promise<void> {
   }
 }
 
-export async function listActiveBrandAssets(): Promise<BrandAssetRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("brand_assets")
-    .select(BRAND_ASSET_SELECT)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error) throw error;
-  return data as BrandAssetRow[];
-}
-
 async function unsetExistingPrimary(
   supabase: Awaited<ReturnType<typeof createClient>>,
   brandProfileId: string,
@@ -907,28 +895,6 @@ export async function reorderBrandAsset(
 // brand_profiles.logo_image_url column for brands that haven't migrated yet
 // (or whose backfill somehow didn't run) — see the create_brand_assets
 // migration's backfill for the normal path.
-export async function getPrimaryLogoUrl(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: asset, error: assetError } = await supabase
-    .from("brand_assets")
-    .select("image_url")
-    .eq("asset_type", "logo")
-    .eq("is_primary", true)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (assetError) throw assetError;
-  if (asset) return asset.image_url;
-
-  const { data: profile, error: profileError } = await supabase
-    .from("brand_profiles")
-    .select("logo_image_url")
-    .maybeSingle();
-
-  if (profileError) throw profileError;
-  return profile?.logo_image_url ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // Approved promotional messages
 // ---------------------------------------------------------------------------

@@ -75,48 +75,6 @@ export function PrimaryTabs({
   );
 }
 
-/**
- * Subordinate tabs for slicing content within a primary tab. Pill-shaped and
- * borderless so the two levels never read as the same control.
- */
-export function SecondaryTabs({
-  items,
-  className,
-  label = "Sub-sections",
-}: {
-  items: TabItem[];
-  className?: string;
-  label?: string;
-}) {
-  const isActive = useIsActive();
-
-  return (
-    <div className={cn("-mx-1 overflow-x-auto", className)}>
-      <nav
-        aria-label={label}
-        className="flex min-w-max items-center gap-1 px-1"
-      >
-        {items.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <TabLink
-              key={item.href}
-              item={item}
-              active={active}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs",
-                active
-                  ? "bg-accent font-medium text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-              )}
-            />
-          );
-        })}
-      </nav>
-    </div>
-  );
-}
-
 function TabLink({
   item,
   active,

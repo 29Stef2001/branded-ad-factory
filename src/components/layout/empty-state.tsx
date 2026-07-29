@@ -3,9 +3,9 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * "This exists but has no data yet" — distinct from ComingSoonState, which
- * means "this is not built yet". Keeping the two separate stops the UI from
- * blurring an empty table into an unimplemented feature.
+ * "This exists but has no data yet", with a way out of it where one applies.
+ * Every empty state should tell the user what to do next rather than just
+ * reporting the absence.
  */
 export function EmptyState({
   icon: Icon,

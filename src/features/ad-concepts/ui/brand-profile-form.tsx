@@ -9,6 +9,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { saveBrandProfileAction } from "@/features/ad-concepts/application/save-brand-profile";
 import { initialActionState } from "@/features/ad-concepts/application/types";
+import {
+  EMBOSS_STYLE_LABELS,
+  FOIL_STYLE_LABELS,
+  FOUNDER_GENDER_LABELS,
+  PHOTOGRAPHY_STYLE_LABELS,
+  PRICE_POSITIONING_LABELS,
+  WRITING_STYLE_LABELS,
+  optionsFor,
+} from "@/features/ad-concepts/domain/labels";
+import {
+  embossStyleEnum,
+  foilStyleEnum,
+  founderGenderEnum,
+  photographyStyleEnum,
+  pricePositioningEnum,
+  writingStyleEnum,
+} from "@/features/ad-concepts/domain/schemas";
 import type { BrandProfile } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 type FieldErrors = Record<string, string[] | undefined> | undefined;
@@ -78,52 +95,27 @@ function NativeSelect({
   );
 }
 
-const WRITING_STYLES = [
-  { value: "direct_response", label: "Direct response" },
-  { value: "conversational", label: "Conversational" },
-  { value: "editorial", label: "Editorial" },
-  { value: "minimal", label: "Minimal" },
-  { value: "storytelling", label: "Storytelling" },
-];
-
-const PHOTOGRAPHY_STYLES = [
-  { value: "documentary", label: "Documentary" },
-  { value: "ugc", label: "UGC" },
-  { value: "studio", label: "Studio" },
-  { value: "editorial", label: "Editorial" },
-  { value: "lifestyle", label: "Lifestyle" },
-  { value: "flat_lay", label: "Flat lay" },
-];
-
-const FOUNDER_GENDERS = [
-  { value: "female", label: "Female" },
-  { value: "male", label: "Male" },
-  { value: "non_binary", label: "Non-binary" },
-  { value: "unspecified", label: "Prefer not to say" },
-];
-
-const PRICE_POSITIONING = [
-  { value: "budget", label: "Budget" },
-  { value: "mid_market", label: "Mid-market" },
-  { value: "premium", label: "Premium" },
-  { value: "luxury", label: "Luxury" },
-];
-
-const EMBOSS_STYLES = [
-  { value: "none", label: "None" },
-  { value: "embossed", label: "Embossed" },
-  { value: "debossed", label: "Debossed" },
-  { value: "engraved", label: "Engraved" },
-  { value: "custom", label: "Custom" },
-];
-
-const FOIL_STYLES = [
-  { value: "none", label: "None" },
-  { value: "copper", label: "Copper" },
-  { value: "gold", label: "Gold" },
-  { value: "silver", label: "Silver" },
-  { value: "custom", label: "Custom" },
-];
+// Derived from the enums that mirror the database constraints, so a value
+// added to a vocabulary reaches this form automatically instead of silently
+// existing everywhere except the UI that sets it.
+const WRITING_STYLES = optionsFor(
+  writingStyleEnum.options,
+  WRITING_STYLE_LABELS,
+);
+const PHOTOGRAPHY_STYLES = optionsFor(
+  photographyStyleEnum.options,
+  PHOTOGRAPHY_STYLE_LABELS,
+);
+const FOUNDER_GENDERS = optionsFor(
+  founderGenderEnum.options,
+  FOUNDER_GENDER_LABELS,
+);
+const PRICE_POSITIONING = optionsFor(
+  pricePositioningEnum.options,
+  PRICE_POSITIONING_LABELS,
+);
+const EMBOSS_STYLES = optionsFor(embossStyleEnum.options, EMBOSS_STYLE_LABELS);
+const FOIL_STYLES = optionsFor(foilStyleEnum.options, FOIL_STYLE_LABELS);
 
 const list = (values: string[] | undefined) => (values ?? []).join(", ");
 

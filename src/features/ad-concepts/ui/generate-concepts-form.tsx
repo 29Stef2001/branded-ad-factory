@@ -39,7 +39,7 @@ export function GenerateConceptsForm({
         <Textarea
           id="brief"
           name="brief"
-          placeholder="Promote our new summer collection to first-time buyers..."
+          placeholder="Promote our new summer collection to first-time buyers…"
           required
           aria-invalid={Boolean(state.fieldErrors?.brief)}
         />
@@ -71,7 +71,7 @@ export function GenerateConceptsForm({
       )}
 
       <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? "Generating..." : "Generate 3 concepts"}
+        {isPending ? "Generating…" : "Generate 3 concepts"}
       </Button>
     </form>
   );

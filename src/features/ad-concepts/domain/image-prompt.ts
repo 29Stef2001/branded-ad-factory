@@ -88,7 +88,7 @@ export function resolveScenePrompt(concept: {
  * preservation — those are the two the model is most tempted to "improve" —
  * while contextual assets guide how the brand's real materials look.
  */
-export function describeReference(
+function describeReference(
   reference: ReferenceDescriptor,
   index: number,
   brandName: string,

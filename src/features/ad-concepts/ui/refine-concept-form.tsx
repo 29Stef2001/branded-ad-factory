@@ -29,7 +29,7 @@ export function RefineConceptForm({ conceptId }: { conceptId: string }) {
           required
         />
         <Button type="submit" disabled={isPending} size="sm" variant="outline">
-          {isPending ? "Refining..." : "Refine"}
+          {isPending ? "Refining…" : "Refine"}
         </Button>
       </div>
       {state.fieldErrors?.instruction && (

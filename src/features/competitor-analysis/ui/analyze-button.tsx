@@ -21,7 +21,7 @@ export function AnalyzeButton({ adId }: { adId: string }) {
         </Alert>
       )}
       <Button type="submit" disabled={isPending} size="sm" variant="outline">
-        {isPending ? "Analyzing..." : "Analyze"}
+        {isPending ? "Analyzing…" : "Analyze"}
       </Button>
     </form>
   );

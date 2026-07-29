@@ -49,7 +49,7 @@ export function ForgotPasswordForm() {
       </div>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? "Sending link..." : "Send reset link"}
+        {isPending ? "Sending link…" : "Send reset link"}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">

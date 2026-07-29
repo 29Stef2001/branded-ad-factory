@@ -71,13 +71,6 @@ export function SidebarItem({
         />
       )}
       <span className="truncate">{item.label}</span>
-      {/* Borderless: at ~30 unbuilt modules, outlined badges dominated the
-          sidebar. Muted uppercase carries the same meaning far more quietly. */}
-      {item.status === "soon" && (
-        <span className="ml-auto shrink-0 text-[9px] leading-none font-medium tracking-[0.08em] text-muted-foreground/45 uppercase">
-          Soon
-        </span>
-      )}
     </Link>
   );
 }

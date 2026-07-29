@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { sectionFor } from "@/components/shell/nav-config";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/data/status-badge";
@@ -44,7 +45,7 @@ export default async function ImageQaPage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Workflow"
+        eyebrow={sectionFor("creative-studio/image-qa")}
         title="Image QA"
         subtitle={`${reviews.length} reviewed`}
         description="Every generated image is reviewed automatically. This is everything that has been judged, newest first — the failures are where the work is."

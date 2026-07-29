@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ImageOff } from "lucide-react";
+import { ArrowDown, ArrowUp, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/data/status-badge";
@@ -112,17 +112,35 @@ export function BrandAssetRow({ asset }: { asset: BrandAssetWithUrl }) {
         <p className="text-sm text-destructive">{errorMessage}</p>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
-        <form action={upAction}>
-          <Button type="submit" size="sm" variant="ghost" disabled={busy}>
-            Up
-          </Button>
-        </form>
-        <form action={downAction}>
-          <Button type="submit" size="sm" variant="ghost" disabled={busy}>
-            Down
-          </Button>
-        </form>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {/* Paired arrows, matching the approved-message row. Ghost text
+            buttons reading "Up"/"Down" did not look clickable. */}
+        <div className="flex items-center gap-1">
+          <form action={upAction}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              aria-label="Move up"
+              title="Move up"
+            >
+              <ArrowUp aria-hidden className="size-3.5" />
+            </Button>
+          </form>
+          <form action={downAction}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              aria-label="Move down"
+              title="Move down"
+            >
+              <ArrowDown aria-hidden className="size-3.5" />
+            </Button>
+          </form>
+        </div>
         {!asset.is_primary && (
           <form action={primaryAction}>
             <Button type="submit" size="sm" variant="outline" disabled={busy}>

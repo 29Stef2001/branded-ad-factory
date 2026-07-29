@@ -29,7 +29,7 @@ export function AddApprovedMessageForm() {
           aria-invalid={Boolean(state.fieldErrors?.message)}
         />
         <Button type="submit" disabled={isPending} size="sm" variant="outline">
-          {isPending ? "Adding..." : "Add message"}
+          {isPending ? "Adding…" : "Add message"}
         </Button>
       </div>
       {state.fieldErrors?.message && (

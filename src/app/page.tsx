@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
@@ -12,8 +12,16 @@ export default function HomePage() {
         e-commerce brand.
       </p>
       <div className="flex items-center gap-3">
-        <Button render={<Link href="/register">Get started</Link>} />
-        <Button variant="outline" render={<Link href="/login">Log in</Link>} />
+        {/* buttonVariants on a Link, as everywhere else in the app. Passing a
+            Link through Button's `render` prop makes it an <a> while Base UI
+            still expects a native <button>, which warns and drops button
+            semantics. */}
+        <Link href="/register" className={buttonVariants()}>
+          Get started
+        </Link>
+        <Link href="/login" className={buttonVariants({ variant: "outline" })}>
+          Log in
+        </Link>
       </div>
     </main>
   );

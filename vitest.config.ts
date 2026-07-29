@@ -1,9 +1,11 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Node environment, not jsdom: everything under test is IO-free domain logic
- * and prompt assembly. No component renders here, so a DOM would cost startup
- * time and buy nothing.
+ * Two projects rather than one environment for everything.
+ *
+ * The domain suite is IO-free logic and runs in Node, where it starts in
+ * milliseconds. Only the component suite pays for jsdom, and only it loads the
+ * jest-dom matchers. Splitting them keeps the fast suite fast.
  *
  * tsconfigPaths resolves the "@/" alias from tsconfig.json rather than
  * duplicating the mapping, so the two cannot drift.
@@ -11,7 +13,24 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: { tsconfigPaths: true },
   test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
+    projects: [
+      {
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: "domain",
+          environment: "node",
+          include: ["src/**/*.test.ts"],
+        },
+      },
+      {
+        resolve: { tsconfigPaths: true },
+        test: {
+          name: "ui",
+          environment: "jsdom",
+          include: ["src/**/*.test.tsx"],
+          setupFiles: ["./vitest.setup.ts"],
+        },
+      },
+    ],
   },
 });

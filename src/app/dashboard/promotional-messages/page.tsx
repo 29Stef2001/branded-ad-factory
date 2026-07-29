@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
+import { sectionFor } from "@/components/shell/nav-config";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { EmptyState } from "@/components/layout/empty-state";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,7 +24,10 @@ export default async function PromotionalMessagesPage() {
   if (!profile) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader eyebrow="Workflow" title="Promotional Messages" />
+        <PageHeader
+          eyebrow={sectionFor("promotional-messages")}
+          title="Promotional Messages"
+        />
         <EmptyState
           title="Set up your brand profile first"
           description="Messages belong to a brand profile, and you don't have one yet."
@@ -45,7 +49,7 @@ export default async function PromotionalMessagesPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Workflow"
+        eyebrow={sectionFor("promotional-messages")}
         title="Promotional Messages"
         subtitle={`${enabled} of ${messages.length} enabled`}
         description="The only promotional wording generation is allowed to use. Every concept must pick one of these verbatim — it can never invent its own claim."

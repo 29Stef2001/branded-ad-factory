@@ -210,7 +210,11 @@ export default async function DashboardPage() {
               : `${stats.generationsTotal} attempts all time`
           }
           icon={Images}
-          tone={stats.generationFailedLast7Days > 0 ? "danger" : "default"}
+          // Deliberately not toned by the error count: the number shown is the
+          // total, and colouring it danger made 18 successful generations read
+          // as 18 failures. The errors are named in the sub-line instead, and
+          // "Needs review now" is the card that asks for action.
+          tone="default"
         />
       </div>
 

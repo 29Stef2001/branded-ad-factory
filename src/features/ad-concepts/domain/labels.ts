@@ -49,6 +49,25 @@ export const STRATEGY_LABELS: Record<string, string> = {
   exploration: "Exploration",
 };
 
+/**
+ * Display order for the Brand Assets page: the three assets generation must
+ * never invent come first, because a missing one of those is the difference
+ * between a real creative and a plausible-looking fake. Stated explicitly
+ * rather than relying on object key order.
+ */
+export const ASSET_TYPE_ORDER = [
+  "owner",
+  "product",
+  "logo",
+  "icon",
+  "packaging",
+  "business_card",
+  "thank_you_card",
+  "shopping_bag",
+  "storefront",
+  "other",
+] as const;
+
 export const ASSET_ROLE_LABELS: Record<string, string> = {
   product: "Product",
   owner: "Owner",
@@ -86,6 +105,29 @@ export const PRICE_POSITIONING_LABELS: Record<string, string> = {
   luxury: "Luxury",
 };
 
+export const FOUNDER_GENDER_LABELS: Record<string, string> = {
+  female: "Female",
+  male: "Male",
+  non_binary: "Non-binary",
+  unspecified: "Prefer not to say",
+};
+
+export const EMBOSS_STYLE_LABELS: Record<string, string> = {
+  none: "None",
+  embossed: "Embossed",
+  debossed: "Debossed",
+  engraved: "Engraved",
+  custom: "Custom",
+};
+
+export const FOIL_STYLE_LABELS: Record<string, string> = {
+  none: "None",
+  copper: "Copper",
+  gold: "Gold",
+  silver: "Silver",
+  custom: "Custom",
+};
+
 /**
  * Falls back to a readable version of the raw value rather than hiding it: an
  * unmapped value should look wrong in review, not disappear in production.
@@ -96,4 +138,20 @@ export function labelFor(
 ): string {
   if (!value) return "";
   return map[value] ?? value.replace(/_/g, " ");
+}
+
+/**
+ * Dropdown options for a stored vocabulary, built from the enum that mirrors
+ * the database constraint plus the shared labels.
+ *
+ * The Brand Profile form used to hand-type both halves, so it carried a second
+ * copy of every option list — a value added to an enum reached the database
+ * and the prompts but never the form. Deriving them means the form cannot fall
+ * behind the schema.
+ */
+export function optionsFor(
+  values: readonly string[],
+  map: Record<string, string>,
+): { value: string; label: string }[] {
+  return values.map((value) => ({ value, label: labelFor(map, value) }));
 }

@@ -59,7 +59,7 @@ export function AddCompetitorForm() {
       </div>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? "Fetching ads..." : "Add competitor"}
+        {isPending ? "Fetching ads…" : "Add competitor"}
       </Button>
     </form>
   );

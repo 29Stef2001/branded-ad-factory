@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/data/status-badge";
 import { Input } from "@/components/ui/input";
 import {
   deleteApprovedMessageAction,
@@ -57,31 +58,49 @@ export function ApprovedMessageRow({
     <div className="flex flex-col gap-2 rounded-lg border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{message.message}</span>
-        <Badge variant={message.is_active ? "default" : "secondary"}>
-          {message.is_active ? "Enabled" : "Disabled"}
-        </Badge>
+        {/* StatusBadge like every other status in the app. A solid primary
+            Badge made "enabled" — the ordinary state of every row — the
+            loudest thing on the page. */}
+        <StatusBadge
+          label={message.is_active ? "Enabled" : "Disabled"}
+          tone={message.is_active ? "success" : "muted"}
+        />
       </div>
 
       {errorMessage && (
         <p className="text-sm text-destructive">{errorMessage}</p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <form action={upAction}>
-          <Button type="submit" size="sm" variant="ghost" disabled={isMovingUp}>
-            Up
-          </Button>
-        </form>
-        <form action={downAction}>
-          <Button
-            type="submit"
-            size="sm"
-            variant="ghost"
-            disabled={isMovingDown}
-          >
-            Down
-          </Button>
-        </form>
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Reordering is one control, so the two arrows sit together and read
+            as a pair. As ghost text buttons they did not look clickable at
+            all, and "Up"/"Down" took more room than the arrows they describe. */}
+        <div className="flex items-center gap-1">
+          <form action={upAction}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={isMovingUp}
+              aria-label="Move up"
+              title="Move up"
+            >
+              <ArrowUp aria-hidden className="size-3.5" />
+            </Button>
+          </form>
+          <form action={downAction}>
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={isMovingDown}
+              aria-label="Move down"
+              title="Move down"
+            >
+              <ArrowDown aria-hidden className="size-3.5" />
+            </Button>
+          </form>
+        </div>
         <form action={toggleAction}>
           <Button
             type="submit"
@@ -89,7 +108,13 @@ export function ApprovedMessageRow({
             variant="outline"
             disabled={isToggling}
           >
-            {isToggling ? "..." : message.is_active ? "Disable" : "Enable"}
+            {isToggling
+              ? message.is_active
+                ? "Disabling…"
+                : "Enabling…"
+              : message.is_active
+                ? "Disable"
+                : "Enable"}
           </Button>
         </form>
         <Button
@@ -121,7 +146,7 @@ export function ApprovedMessageRow({
             className="min-w-64 flex-1"
           />
           <Button type="submit" size="sm" disabled={isUpdating}>
-            {isUpdating ? "Saving..." : "Save"}
+            {isUpdating ? "Saving…" : "Save"}
           </Button>
         </form>
       )}

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { sectionFor } from "@/components/shell/nav-config";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { EmptyState } from "@/components/layout/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/data/status-badge";
 import { ConceptPicker } from "@/features/ad-concepts/ui/concept-picker";
 import { PromptEditor } from "@/features/ad-concepts/ui/prompt-editor";
@@ -63,7 +64,10 @@ export default async function PromptBuilderPage({
         description="Inspect and edit each concept's scene description, and see which brand assets would be attached alongside it. Your brand context, the English-only rule and the promotional message are added automatically on top of this at generation time."
       />
 
-      <Suspense fallback={null}>
+      {/* The picker reads the selected concept from the URL, so it suspends.
+          A null fallback left a gap where the control belongs and the page
+          looked like it had rendered without one. */}
+      <Suspense fallback={<Skeleton className="h-14 w-full max-w-xl" />}>
         <ConceptPicker concepts={concepts} />
       </Suspense>
 
@@ -78,8 +82,31 @@ export default async function PromptBuilderPage({
           }
         />
       ) : (
-        <ConceptDetail conceptId={conceptId} />
+        <Suspense key={conceptId} fallback={<ConceptDetailSkeleton />}>
+          <ConceptDetail conceptId={conceptId} />
+        </Suspense>
       )}
+    </div>
+  );
+}
+
+/** Mirrors ConceptDetail's two-column layout so switching concepts does not
+    collapse the page and push the picker up the screen. */
+function ConceptDetailSkeleton() {
+  return (
+    <div
+      className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+      role="status"
+      aria-label="Loading concept"
+    >
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-72 rounded-xl" />
+      </div>
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-56 rounded-xl" />
+      </div>
     </div>
   );
 }
