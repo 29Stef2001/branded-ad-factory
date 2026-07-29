@@ -7,6 +7,7 @@ import { BrandProfileForm } from "@/features/ad-concepts/ui/brand-profile-form";
 import { BrandCompletenessPanel } from "@/features/ad-concepts/ui/brand-completeness-panel";
 import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
 import { getBrandProfile } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import { sectionFor } from "@/components/shell/nav-config";
 
 export const metadata: Metadata = {
   title: "Brand Profile — Branded Ad Factory",
@@ -20,7 +21,7 @@ export default async function BrandProfilePage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Creative Studio"
+        eyebrow={sectionFor("brand-profile")}
         title="Brand Profile"
         subtitle={isFirstRun ? undefined : `${completeness.score}% complete`}
         description="Everything the AI modules know about this brand. Concept generation, image generation and QA all read from here — nothing about the brand is configured anywhere else."

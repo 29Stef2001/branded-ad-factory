@@ -2,6 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Label } from "@/components/ui/label";
+import {
+  GENERATION_STATUS_LABELS,
+  STRATEGY_LABELS,
+  labelFor,
+} from "@/features/ad-concepts/domain/labels";
 import type { ConceptSummary } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 
 /**
@@ -33,10 +38,16 @@ export function ConceptPicker({ concepts }: { concepts: ConceptSummary[] }) {
       >
         <option value="">Select a concept…</option>
         {concepts.map((concept) => (
+          // An <option> renders text only, so the shared labels are used
+          // directly here rather than the StatusBadge the rest of the app uses.
           <option key={concept.id} value={concept.id}>
             {concept.headline}
-            {concept.strategy_type ? ` — ${concept.strategy_type}` : ""}
-            {concept.generation_status ? ` (${concept.generation_status})` : ""}
+            {concept.strategy_type
+              ? ` — ${labelFor(STRATEGY_LABELS, concept.strategy_type)}`
+              : ""}
+            {concept.generation_status
+              ? ` (${labelFor(GENERATION_STATUS_LABELS, concept.generation_status)})`
+              : ""}
           </option>
         ))}
       </select>

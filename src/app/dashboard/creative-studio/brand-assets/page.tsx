@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { buttonVariants } from "@/components/ui/button";
 import { BrandAssetsManager } from "@/features/ad-concepts/ui/brand-assets-manager";
+import { sectionFor } from "@/components/shell/nav-config";
 import {
   getBrandProfile,
   listBrandAssetsWithUrls,
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
   title: "Brand Assets — Branded Ad Factory",
 };
 
+/** Both the empty and populated headers announce the same section. */
+const SECTION = sectionFor("creative-studio/brand-assets");
+
 export default async function BrandAssetsPage() {
   const brandProfile = await getBrandProfile();
 
@@ -21,13 +25,13 @@ export default async function BrandAssetsPage() {
   if (!brandProfile) {
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader eyebrow="Creative Studio" title="Brand Assets" />
+        <PageHeader eyebrow={SECTION} title="Brand Assets" />
         <EmptyState
           title="Set up your brand profile first"
           description="Brand assets belong to a brand profile, and you don't have one yet."
           action={
             <Link
-              href="/dashboard/concepts"
+              href="/dashboard/brand-profile"
               className={buttonVariants({ size: "sm" })}
             >
               Go to brand profile
@@ -44,7 +48,7 @@ export default async function BrandAssetsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Creative Studio"
+        eyebrow={SECTION}
         title="Brand Assets"
         subtitle={`${assets.length} total · ${activeCount} active`}
         description="Real reference images for this brand — logo, packaging, storefront and more. Image generation picks from the active ones automatically, based on what each concept's scene requires."

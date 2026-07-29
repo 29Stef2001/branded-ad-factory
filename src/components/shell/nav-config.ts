@@ -105,3 +105,22 @@ export function hrefFor(item: NavLeaf): string {
 export function findLeafBySegment(segment: string): NavLeaf | undefined {
   return NAV_LEAVES.find((leaf) => leaf.segment === segment);
 }
+
+/**
+ * The section a page belongs to, for its header eyebrow.
+ *
+ * Derived from the tree rather than typed per page, because typing it drifted:
+ * Brand Profile, Brand Assets and Prompt Builder each announced "Creative
+ * Studio" while sitting in Workflow beside Image QA, which announced
+ * "Workflow". The eyebrow tells the user where they are, so it has to be the
+ * same fact the sidebar highlights, not a second copy of it. The URL is not
+ * that fact either — several Workflow pages live under /creative-studio/ for
+ * historical reasons.
+ */
+export function sectionFor(segment: string): string | undefined {
+  const group = NAV_TREE.find(
+    (entry) =>
+      isGroup(entry) && entry.items.some((item) => item.segment === segment),
+  );
+  return group && isGroup(group) ? group.label : undefined;
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/layout/page-header";
+import { sectionFor } from "@/components/shell/nav-config";
 import { getLaunchStatus } from "@/features/ad-launch/application/get-launch-status";
 import { LaunchMetaPanel } from "@/features/ad-launch/ui/launch-meta-panel";
 
@@ -13,7 +14,7 @@ export default async function LaunchPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Ad Factory"
+        eyebrow={sectionFor("ad-factory/launch")}
         title="Launch in Meta"
         description="Reports what the connected Meta account is actually permitted to do. Drafts only — this app never publishes a live ad."
       />

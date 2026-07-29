@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { FileText } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { sectionFor } from "@/components/shell/nav-config";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/data/status-badge";
@@ -50,10 +51,10 @@ export default async function PromptBuilderPage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Creative Studio"
+        eyebrow={sectionFor("creative-studio/prompt-builder")}
         title="Prompt Builder"
         subtitle={`${concepts.length} concepts`}
-        description="Inspect and edit the prompt image generation actually uses, and see which brand assets would be attached alongside it."
+        description="Inspect and edit each concept's scene description, and see which brand assets would be attached alongside it. Your brand context, the English-only rule and the promotional message are added automatically on top of this at generation time."
       />
 
       <Suspense fallback={null}>

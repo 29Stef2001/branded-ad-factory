@@ -8,6 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DarkPanel } from "@/components/layout/dark-panel";
+import { PageHeader } from "@/components/layout/page-header";
+import { sectionFor } from "@/components/shell/nav-config";
 import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
 import { buttonVariants } from "@/components/ui/button";
 import { GenerateConceptsForm } from "@/features/ad-concepts/ui/generate-concepts-form";
@@ -46,13 +48,12 @@ export default async function ConceptsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Ad Concepts</h1>
-        <p className="text-muted-foreground">
-          Generate original, on-brand ad concepts — optionally informed by a
-          competitor ad you&apos;ve already analyzed.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow={sectionFor("concepts")}
+        title="Ad Concepts"
+        subtitle={`${concepts.length} total`}
+        description="Generate original, on-brand ad concepts — optionally informed by a competitor ad you've already analyzed."
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
         <div className="flex flex-col gap-6">
