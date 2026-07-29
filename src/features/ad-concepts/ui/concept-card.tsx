@@ -88,9 +88,13 @@ export function ConceptCard({
               {concept.promotional_message.message}
             </p>
           )}
-          <p className="line-clamp-3 text-muted-foreground">
-            {concept.body_copy}
-          </p>
+          {/* The clamped preview is a stand-in for the full copy below, so it
+              would otherwise print the same paragraph twice once expanded. */}
+          {!expanded && (
+            <p className="line-clamp-3 text-muted-foreground">
+              {concept.body_copy}
+            </p>
+          )}
         </div>
       </div>
 
