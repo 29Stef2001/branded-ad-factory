@@ -166,31 +166,51 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* An all-time "QA failed" count answered no question worth asking: it
+          mixed today's problem with every experiment ever run, so it only ever
+          went up and never told anyone to do anything. These three say what is
+          outstanding now and what the last week actually looked like. */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Images generated"
-          value={stats.generationsTotal}
-          sub="attempts, successful and failed"
-          icon={Images}
-        />
-        <MetricCard
-          label="QA passed"
-          value={stats.qaPassed}
-          sub={`${stats.qaFailed} failed, ${stats.qaUnreviewed} unreviewed`}
-          icon={BadgeCheck}
-          tone={stats.qaFailed > 0 ? "warning" : "success"}
-        />
-        <MetricCard
-          label="QA failed"
-          value={stats.qaFailed}
+          label="Needs review now"
+          value={stats.needsReviewNow}
           sub={
-            stats.qaFailed > 0
-              ? "each has a suggested prompt fix"
-              : "nothing needs review"
+            stats.needsReviewNow > 0
+              ? "rejected by QA, each with a suggested fix"
+              : "nothing waiting on you"
           }
           icon={BadgeCheck}
-          href="/dashboard/creative-studio/prompt-builder"
-          tone={stats.qaFailed > 0 ? "danger" : "success"}
+          href="/dashboard/creative-studio/image-qa?filter=failed"
+          tone={stats.needsReviewNow > 0 ? "warning" : "success"}
+        />
+        <MetricCard
+          label="Passed, last 7 days"
+          value={stats.qaPassedLast7Days}
+          sub={`${stats.qaPassed} all time`}
+          icon={BadgeCheck}
+          href="/dashboard/creative-studio/image-qa?filter=passed"
+          tone={stats.qaPassedLast7Days > 0 ? "success" : "default"}
+        />
+        <MetricCard
+          label="Failed QA, last 7 days"
+          value={stats.qaFailedLast7Days}
+          sub={`${stats.qaFailed} all time`}
+          icon={BadgeCheck}
+          href="/dashboard/creative-studio/image-qa?filter=failed"
+          tone={stats.qaFailedLast7Days > 0 ? "warning" : "success"}
+        />
+        <MetricCard
+          label="Generations, last 7 days"
+          value={stats.qaPassedLast7Days + stats.qaFailedLast7Days}
+          // A generation that errored produced no image at all, which is a
+          // different problem from one QA rejected — worth not conflating.
+          sub={
+            stats.generationFailedLast7Days > 0
+              ? `${stats.generationFailedLast7Days} errored before producing an image`
+              : `${stats.generationsTotal} attempts all time`
+          }
+          icon={Images}
+          tone={stats.generationFailedLast7Days > 0 ? "danger" : "default"}
         />
       </div>
 

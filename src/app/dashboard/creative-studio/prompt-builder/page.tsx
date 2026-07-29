@@ -24,6 +24,12 @@ import {
   labelFor,
 } from "@/features/ad-concepts/domain/labels";
 import { selectReferenceAssets } from "@/features/ad-concepts/domain/asset-selection";
+import { buildBrandContext } from "@/features/ad-concepts/domain/brand-context";
+import {
+  buildImagePromptSections,
+  resolveScenePrompt,
+} from "@/features/ad-concepts/domain/image-prompt";
+import { AssembledPrompt } from "@/features/ad-concepts/ui/assembled-prompt";
 import {
   getBrandProfile,
   getConceptPromptDetail,
@@ -146,12 +152,39 @@ async function ConceptDetail({ conceptId }: { conceptId: string }) {
     }
   }
 
-  const activePrompt =
-    detail.generation_prompt_override ??
-    detail.final_generation_prompt ??
-    detail.visual_direction;
+  // The same resolution generation performs, from the same domain function,
+  // so the page cannot claim one prompt while generation uses another.
+  const activePrompt = resolveScenePrompt({
+    generationPromptOverride: detail.generation_prompt_override,
+    finalGenerationPrompt: detail.final_generation_prompt,
+    visualDirection: detail.visual_direction,
+  });
 
-  const structured = detail.structured_concept ?? {};
+  const structured = (detail.structured_concept ?? {}) as {
+    messagePlacement?: string;
+    textStyle?: string;
+  };
+
+  // Built from the same builder the image client uses, with the references
+  // this page already resolved — so what is shown is what would be sent.
+  const promptSections = brandProfile
+    ? buildImagePromptSections(
+        {
+          brand: buildBrandContext(brandProfile),
+          scenePrompt: activePrompt,
+          promotionalMessage: detail.promotional_message?.message ?? null,
+          messagePlacement: structured.messagePlacement ?? null,
+          textStyle: structured.textStyle ?? null,
+          overflowNotes: selection.overflowNotes,
+        },
+        references
+          .filter((reference) => !reference.missing)
+          .map((reference) => ({
+            role: reference.role,
+            label: reference.asset?.label ?? null,
+          })),
+      )
+    : null;
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -204,6 +237,8 @@ async function ConceptDetail({ conceptId }: { conceptId: string }) {
           prompt={activePrompt}
           isEdited={detail.generation_prompt_override !== null}
         />
+
+        {promptSections && <AssembledPrompt sections={promptSections} />}
 
         {Object.keys(structured).length > 0 && (
           <DarkPanel

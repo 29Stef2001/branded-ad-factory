@@ -1,32 +1,13 @@
 import OpenAI, { toFile } from "openai";
 import {
-  renderBrandHeadline,
-  renderBrandStyle,
-  renderLanguageRule,
-  renderRules,
-  type BrandContext,
-} from "@/features/ad-concepts/domain/brand-context";
+  buildImagePrompt,
+  type ImagePromptInput,
+} from "@/features/ad-concepts/domain/image-prompt";
 import { env } from "@/lib/env";
 
 const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
-export type ImagePromptInput = {
-  /** Brand facts, rendered by the shared builder rather than restated here. */
-  brand: BrandContext;
-  /**
-   * The concept's self-contained scene description — `final_generation_prompt`
-   * when the concept has one, falling back to `visual_direction` for concepts
-   * generated before structured output existed.
-   */
-  scenePrompt: string;
-  /** Exact approved copy to render as physical signage, if the concept picked one. */
-  promotionalMessage?: string | null;
-  /** Where in the scene that message belongs, from the structured concept. */
-  messagePlacement?: string | null;
-  textStyle?: string | null;
-  /** Requirements that didn't fit the reference-image budget, described in words. */
-  overflowNotes?: string[];
-};
+export type { ImagePromptInput };
 
 export type ReferenceImage = { buffer: Buffer; contentType: string };
 
@@ -95,95 +76,13 @@ function extractImage(result: OpenAI.Images.ImagesResponse): Buffer {
   return Buffer.from(b64, "base64");
 }
 
-/**
- * How each reference role should be treated. Product and logo demand exact
- * preservation — those are the two the model is most tempted to "improve" —
- * while contextual assets are guidance for how the brand's real materials look.
- */
-function describeReference(
-  reference: NamedReference,
-  index: number,
-  brandName: string,
-): string {
-  const position = `Reference image ${index + 1}`;
-  const named = reference.label ? ` ("${reference.label}")` : "";
-
-  switch (reference.role) {
-    case "product":
-      return `${position} shows an actual "${brandName}" product that must be preserved exactly as-is — its shape, color, material, patina and details must not change. The jewellery visible in the scene must be this exact piece, not an invented or generic substitute. Change only the environment, lighting and styling around it — never the product itself.`;
-    case "owner":
-      return `${position} shows the real owner of "${brandName}". When a person appears in the scene, it is her — match her age, build, hair, and face as closely as you can, and do not substitute a different person or gender. She is the brand's actual owner, not a hired model.`;
-    case "logo":
-      return `${position} shows the real "${brandName}" brand logo — reproduce it faithfully, do not redesign, restyle, or reinterpret it. Where packaging, a box or a sign appears in the scene, show this exact logo on it.`;
-    default:
-      return `${position}${named} shows this brand's real ${reference.role.replace(/_/g, " ")}. Where that element appears in the scene, match this reference's actual appearance — its materials, colors and proportions — rather than inventing a generic version.`;
-  }
-}
-
-function buildPrompt(
-  input: ImagePromptInput,
-  references: NamedReference[],
-): string {
-  const sections: string[] = [
-    `Create a high-quality advertising visual for ${renderBrandHeadline(input.brand)}.`,
-  ];
-
-  if (references.length > 0) {
-    sections.push(
-      references
-        .map((reference, index) =>
-          describeReference(reference, index, input.brand.brandName),
-        )
-        .join("\n\n"),
-    );
-  }
-
-  const style = renderBrandStyle(input.brand);
-  if (style) sections.push(style);
-
-  const rules = renderRules(input.brand, "image");
-  if (rules) sections.push(rules);
-
-  sections.push(`Scene: ${input.scenePrompt}`);
-
-  if (input.overflowNotes?.length) {
-    // These are assets the concept asked for that didn't fit the reference
-    // budget. Describing them beats dropping them silently.
-    sections.push(
-      `Also present in the scene, described rather than attached: ${input.overflowNotes.join("; ")}.`,
-    );
-  }
-
-  // The promotional message is the one piece of text the image is allowed to
-  // carry, and only as something physically in the scene — printed signage
-  // survives being rendered by an image model far better than an overlay.
-  if (input.promotionalMessage) {
-    const placement = input.messagePlacement
-      ? ` Place it ${input.messagePlacement}.`
-      : "";
-    const style = input.textStyle ? ` Style: ${input.textStyle}.` : "";
-    sections.push(
-      `The scene must include this exact promotional message as real physical signage — printed, painted or lettered on a surface within the scene, never as a digital overlay: "${input.promotionalMessage}".${placement}${style} Reproduce the wording exactly, with no other words, headlines or text anywhere in the image.`,
-    );
-  } else {
-    sections.push(
-      "Do not render any words, letters, headlines, or text overlays in the image, beyond a brand logo if one is supplied as a reference.",
-    );
-  }
-
-  // The store sells to a US audience, so any lettering the model does render —
-  // signage, packaging, a price card — has to be English. Stated last so it
-  // reads as an overriding rule rather than one detail among many.
-  sections.push(renderLanguageRule(input.brand, "image"));
-
-  return sections.join("\n\n").trim();
-}
-
 export async function generateConceptImage(
   input: ImagePromptInput,
   references: NamedReference[] = [],
 ): Promise<Buffer> {
-  const prompt = buildPrompt(input, references);
+  // Assembly lives in domain/image-prompt so it can be tested and so the
+  // Prompt Builder can show the user the same text this sends.
+  const prompt = buildImagePrompt(input, references);
 
   // GPT image models always return base64-encoded images — response_format
   // isn't a supported param for them (unlike dall-e-2/3) and would error if sent.

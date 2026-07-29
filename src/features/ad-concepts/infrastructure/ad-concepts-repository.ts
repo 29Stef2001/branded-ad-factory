@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { resolveScenePrompt } from "@/features/ad-concepts/domain/image-prompt";
+import { matchApprovedMessage } from "@/features/ad-concepts/domain/approved-message";
 import type {
   BrandAssetType,
   Concept,
@@ -333,6 +335,15 @@ export async function getInspirationAd(
 // invent promotional copy outside the approved list" — a non-match means the
 // concept is inserted with no linked message rather than silently trusting an
 // unapproved string.
+/**
+ * The approved message a concept refers to, matched in the domain rather than
+ * by SQL equality.
+ *
+ * `.eq("message", text)` unlinked silently whenever the model returned the
+ * right wording with a trailing space or different capitalisation: the concept
+ * saved with no message id, generated an image with that wording as signage,
+ * and only failed at QA as an unapproved claim — one paid render later.
+ */
 async function findApprovedMessageIdByText(
   brandProfileId: string,
   message: string,
@@ -340,13 +351,11 @@ async function findApprovedMessageIdByText(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("approved_promotional_messages")
-    .select("id")
-    .eq("brand_profile_id", brandProfileId)
-    .eq("message", message)
-    .maybeSingle();
+    .select("id, message")
+    .eq("brand_profile_id", brandProfileId);
 
   if (error) throw error;
-  return data?.id ?? null;
+  return matchApprovedMessage(message, data ?? [])?.id ?? null;
 }
 
 export async function insertConcepts(
@@ -491,12 +500,12 @@ export async function getConceptForGeneration(
   } | null;
 
   return {
-    // A hand-edited prompt wins over the generated one, which in turn wins over
-    // visual_direction for concepts created before structured output existed.
-    finalGenerationPrompt:
-      data.generation_prompt_override ??
-      data.final_generation_prompt ??
-      data.visual_direction,
+    // Precedence lives in domain/image-prompt so it is stated once and tested.
+    finalGenerationPrompt: resolveScenePrompt({
+      generationPromptOverride: data.generation_prompt_override,
+      finalGenerationPrompt: data.final_generation_prompt,
+      visualDirection: data.visual_direction,
+    }),
     brandAssetRequirements: data.brand_asset_requirements ?? [],
     promotionalMessage: promotionalMessage?.message ?? null,
     messagePlacement: structured?.messagePlacement ?? null,
@@ -1263,6 +1272,12 @@ export type DashboardStats = {
   qaPassed: number;
   qaFailed: number;
   qaUnreviewed: number;
+  /** Renders whose QA said no and that nobody has acted on yet. */
+  needsReviewNow: number;
+  qaPassedLast7Days: number;
+  qaFailedLast7Days: number;
+  /** Generations that errored outright — no image exists at all. */
+  generationFailedLast7Days: number;
   messagesTotal: number;
   messagesEnabled: number;
 };
@@ -1283,6 +1298,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   // Written out rather than routed through a generic helper: the Supabase
   // builder changes type after each filter, so a shared wrapper ends up fighting
   // its own generics for no real saving.
+  // A rolling window rather than a fixed calendar week: "the last 7 days" is
+  // what the label promises, and a Monday reset would make Monday's dashboard
+  // look like nothing had ever happened.
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
   const [
     conceptsTotal,
     conceptsWithImage,
@@ -1290,6 +1310,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     qaPassed,
     qaFailed,
     qaUnreviewed,
+    needsReviewNow,
+    qaPassedLast7Days,
+    qaFailedLast7Days,
+    generationFailedLast7Days,
   ] = await Promise.all([
     supabase.from("ad_concepts").select("*", HEAD),
     supabase
@@ -1309,6 +1333,25 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .from("creative_generations")
       .select("*", HEAD)
       .is("qa_passed", null),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .eq("status", "needs_review"),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .eq("qa_passed", true)
+      .gte("created_at", since),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .eq("qa_passed", false)
+      .gte("created_at", since),
+    supabase
+      .from("creative_generations")
+      .select("*", HEAD)
+      .eq("status", "failed")
+      .gte("created_at", since),
   ]);
 
   for (const result of [
@@ -1318,6 +1361,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     qaPassed,
     qaFailed,
     qaUnreviewed,
+    needsReviewNow,
+    qaPassedLast7Days,
+    qaFailedLast7Days,
+    generationFailedLast7Days,
   ]) {
     if (result.error) throw result.error;
   }
@@ -1336,6 +1383,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     qaPassed: qaPassed.count ?? 0,
     qaFailed: qaFailed.count ?? 0,
     qaUnreviewed: qaUnreviewed.count ?? 0,
+    needsReviewNow: needsReviewNow.count ?? 0,
+    qaPassedLast7Days: qaPassedLast7Days.count ?? 0,
+    qaFailedLast7Days: qaFailedLast7Days.count ?? 0,
+    generationFailedLast7Days: generationFailedLast7Days.count ?? 0,
     messagesTotal: messages.length,
     messagesEnabled: messages.filter((m) => m.is_active).length,
   };
