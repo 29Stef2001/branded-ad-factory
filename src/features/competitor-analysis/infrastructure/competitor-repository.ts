@@ -1,30 +1,36 @@
 import { createClient } from "@/lib/supabase/server";
 import type { MetaAd } from "@/features/competitor-analysis/infrastructure/meta-ad-library-client";
 import type { AdAnalysis } from "@/features/competitor-analysis/domain/schemas";
+import type { Tables } from "@/types/supabase";
 
-export type Competitor = {
-  id: string;
-  name: string;
-  meta_page_id: string;
-  created_at: string;
-};
+export type Competitor = Pick<
+  Tables<"competitors">,
+  "id" | "name" | "meta_page_id" | "created_at"
+>;
 
-export type CompetitorAdWithAnalysis = {
-  id: string;
-  page_name: string | null;
-  ad_creative_body: string | null;
-  ad_creative_link_title: string | null;
-  ad_creative_link_description: string | null;
-  ad_snapshot_url: string | null;
-  ad_delivery_start_time: string | null;
-  ad_analyses: {
-    messaging_angle: string;
-    hook: string;
-    tone: string;
-    target_audience: string;
-    call_to_action: string;
-    summary: string;
-  } | null;
+/**
+ * An ad plus its embedded analysis. The ad columns come from the generated
+ * Row; the embed cannot, because PostgREST joins are query-specific.
+ */
+export type CompetitorAdWithAnalysis = Pick<
+  Tables<"competitor_ads">,
+  | "id"
+  | "page_name"
+  | "ad_creative_body"
+  | "ad_creative_link_title"
+  | "ad_creative_link_description"
+  | "ad_snapshot_url"
+  | "ad_delivery_start_time"
+> & {
+  ad_analyses: Pick<
+    Tables<"ad_analyses">,
+    | "messaging_angle"
+    | "hook"
+    | "tone"
+    | "target_audience"
+    | "call_to_action"
+    | "summary"
+  > | null;
 };
 
 export async function createCompetitor(

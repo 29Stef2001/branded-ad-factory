@@ -7,6 +7,29 @@ import type {
   ConceptV2,
   GenerationStatus,
 } from "@/features/ad-concepts/domain/schemas";
+import type { Tables } from "@/types/supabase";
+
+/**
+ * Row types are derived from the generated schema rather than restated.
+ *
+ * Two deliberate departures from using `Tables<...>` directly:
+ *
+ * `Pick` rather than the whole Row, because these mirror what the select
+ * statements actually fetch. brand_profiles still carries `industry`, `tone`
+ * and `unique_selling_points` from before Brand DNA; excluding them by
+ * construction is what stops a second source of truth growing back.
+ *
+ * And several columns are narrowed. The generator can only see what Postgres
+ * tells it, so a CHECK-constrained text column arrives as `string` and a jsonb
+ * column as `Json`. The zod enums mirror those same constraints, so narrowing
+ * here keeps the stronger guarantee — replacing these with the generated types
+ * verbatim would have lost type safety, not gained it.
+ */
+type BrandProfileTable = Tables<"brand_profiles">;
+type BrandAssetTable = Tables<"brand_assets">;
+type ApprovedMessageTable = Tables<"approved_promotional_messages">;
+type CreativeGenerationTable = Tables<"creative_generations">;
+type AdConceptTable = Tables<"ad_concepts">;
 
 export type BrandColors = {
   primary?: string;
@@ -21,71 +44,80 @@ export type BrandColors = {
  */
 export const BRAND_PROFILE_SCHEMA_VERSION = 1;
 
-export type BrandProfile = {
-  schema_version: number;
-  updated_by: string | null;
-  updated_at: string;
-  migration_source: string | null;
+/** Exactly the columns getBrandProfile() selects — the legacy trio is excluded. */
+export type BrandProfile = Omit<
+  Pick<
+    BrandProfileTable,
+    | "schema_version"
+    | "updated_by"
+    | "updated_at"
+    | "migration_source"
+    | "metadata"
+    | "brand_name"
+    | "brand_category"
+    | "markets"
+    | "languages"
+    | "brand_story"
+    | "brand_mission"
+    | "target_audience"
+    | "tone_attributes"
+    | "tone_notes"
+    | "writing_style"
+    | "visual_style"
+    | "photography_style"
+    | "brand_colors"
+    | "typography_notes"
+    | "logo_rules"
+    | "emboss_style"
+    | "emboss_custom_notes"
+    | "foil_style"
+    | "foil_custom_notes"
+    | "logo_image_url"
+    | "founder_name"
+    | "founder_gender"
+    | "founder_age"
+    | "founder_background"
+    | "product_positioning"
+    | "price_positioning"
+    | "materials"
+    | "usps"
+    | "brand_values"
+    | "words_to_always_use"
+    | "words_to_never_use"
+    | "image_generation_rules"
+    | "copy_generation_rules"
+    | "qa_expectations"
+    | "qa_min_score"
+  >,
+  "brand_colors" | "metadata"
+> & {
+  /** jsonb, so the generator can only say `Json`. */
+  brand_colors: BrandColors | null;
   /** Experimental values. Never rendered into a prompt — see brand-context.ts. */
   metadata: Record<string, unknown>;
-
-  brand_name: string;
-  brand_category: string | null;
-  markets: string[];
-  languages: string[];
-  brand_story: string | null;
-  brand_mission: string | null;
-
-  target_audience: string;
-  tone_attributes: string[];
-  tone_notes: string | null;
-  writing_style: string | null;
-
-  visual_style: string | null;
-  photography_style: string | null;
-  brand_colors: BrandColors | null;
-  typography_notes: string | null;
-  logo_rules: string | null;
-  emboss_style: string | null;
-  emboss_custom_notes: string | null;
-  foil_style: string | null;
-  foil_custom_notes: string | null;
-  logo_image_url: string | null;
-
-  founder_name: string | null;
-  founder_gender: string | null;
-  founder_age: number | null;
-  founder_background: string | null;
-
-  product_positioning: string | null;
-  price_positioning: string | null;
-  materials: string[];
-  usps: string[];
-  brand_values: string[];
-
-  words_to_always_use: string[];
-  words_to_never_use: string[];
-
-  image_generation_rules: string | null;
-  copy_generation_rules: string | null;
-  qa_expectations: string | null;
-  qa_min_score: number | null;
 };
 
-export type BrandAssetRow = {
-  id: string;
+export type BrandAssetRow = Omit<
+  Pick<
+    BrandAssetTable,
+    | "id"
+    | "asset_type"
+    | "label"
+    // image_url is null when the asset was uploaded rather than linked, and
+    // storage_path is null in the other direction.
+    | "image_url"
+    | "storage_path"
+    | "is_primary"
+    | "is_active"
+    | "region"
+    | "season"
+    | "sort_order"
+    | "tags"
+  >,
+  "asset_type"
+> & {
+  /** CHECK-constrained in Postgres, so the generator sees only `string`. */
   asset_type: BrandAssetType;
-  label: string | null;
-  /** Null when the asset was uploaded rather than linked. */
-  image_url: string | null;
-  /** Null when the asset was linked rather than uploaded. */
-  storage_path: string | null;
-  is_primary: boolean;
-  is_active: boolean;
-  region: string | null;
-  season: string | null;
-  sort_order: number;
-  tags: string[];
 };
 
 /**
@@ -95,34 +127,24 @@ export type BrandAssetRow = {
  */
 export type BrandAssetWithUrl = BrandAssetRow & { displayUrl: string | null };
 
-export type ApprovedMessageRow = {
-  id: string;
-  message: string;
-  is_active: boolean;
-  sort_order: number;
-  category: string | null;
-  usage_notes: string | null;
-  region: string | null;
-  campaign: string | null;
-};
+export type ApprovedMessageRow = Pick<
+  ApprovedMessageTable,
+  | "id"
+  | "message"
+  | "is_active"
+  | "sort_order"
+  | "category"
+  | "usage_notes"
+  | "region"
+  | "campaign"
+>;
 
-export type CreativeGenerationRow = {
-  id: string;
-  concept_id: string;
-  attempt_number: number;
-  status: string;
-  image_path: string | null;
-  selected_reference_roles: string[];
+export type CreativeGenerationRow = Omit<
+  CreativeGenerationTable,
+  "qa_scores" | "updated_at"
+> & {
+  /** jsonb of dimension -> score; the generator can only say `Json`. */
   qa_scores: Record<string, number> | null;
-  qa_passed: boolean | null;
-  qa_notes: string | null;
-  qa_score: number | null;
-  detected_issues: string[];
-  qa_suggested_prompt: string | null;
-  reviewed_at: string | null;
-  retry_reason: string | null;
-  failure_reason: string | null;
-  created_at: string;
 };
 
 export type InspirationOption = {
@@ -132,21 +154,28 @@ export type InspirationOption = {
   messagingAngle: string;
 };
 
-export type ConceptRow = {
-  id: string;
-  headline: string;
-  hook: string;
-  body_copy: string;
-  visual_direction: string;
-  call_to_action: string;
-  created_at: string;
-  creative_image_path: string | null;
-  product_image_url: string | null;
-  strategy_type: string | null;
-  campaign_angle: string | null;
-  brand_asset_requirements: string[];
-  generation_status: string | null;
-  generation_retry_count: number;
+/**
+ * A concept plus the three relations listConcepts() joins in. The columns come
+ * from the generated Row; the joined shapes cannot, because PostgREST embeds
+ * are query-specific rather than part of the table.
+ */
+export type ConceptRow = Pick<
+  AdConceptTable,
+  | "id"
+  | "headline"
+  | "hook"
+  | "body_copy"
+  | "visual_direction"
+  | "call_to_action"
+  | "created_at"
+  | "creative_image_path"
+  | "product_image_url"
+  | "strategy_type"
+  | "campaign_angle"
+  | "brand_asset_requirements"
+  | "generation_status"
+  | "generation_retry_count"
+> & {
   competitor_ads: { competitors: { name: string } | null } | null;
   original: { headline: string } | null;
   promotional_message: { message: string } | null;
@@ -164,7 +193,17 @@ export async function getBrandProfile(): Promise<BrandProfile | null> {
     .maybeSingle();
 
   if (error) throw error;
-  return data as BrandProfile | null;
+  if (!data) return null;
+
+  // Spread rather than `as BrandProfile`: a blanket cast also silenced the
+  // column list, so a typo in the select above compiled fine and failed at
+  // runtime. Only the two jsonb columns are narrowed by hand, and the rest has
+  // to satisfy BrandProfile on its own.
+  return {
+    ...data,
+    brand_colors: data.brand_colors as BrandColors | null,
+    metadata: (data.metadata ?? {}) as Record<string, unknown>,
+  };
 }
 
 async function getBrandProfileId(): Promise<string | null> {
@@ -616,7 +655,12 @@ export async function listBrandAssets(): Promise<BrandAssetRow[]> {
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
-  return data as BrandAssetRow[];
+  // Only asset_type is narrowed; the remaining columns must satisfy
+  // BrandAssetRow on their own, so a change to BRAND_ASSET_SELECT is caught.
+  return data.map((row) => ({
+    ...row,
+    asset_type: row.asset_type as BrandAssetType,
+  }));
 }
 
 /**
@@ -910,7 +954,7 @@ export async function listApprovedMessages(): Promise<ApprovedMessageRow[]> {
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
-  return data as ApprovedMessageRow[];
+  return data;
 }
 
 export async function listEnabledApprovedMessages(): Promise<
@@ -924,7 +968,7 @@ export async function listEnabledApprovedMessages(): Promise<
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
-  return data as ApprovedMessageRow[];
+  return data;
 }
 
 export async function createApprovedMessage(input: {
@@ -1114,13 +1158,10 @@ export async function updateGenerationAttempt(
  * count so far plus one. `head: true` keeps this a count query rather than
  * pulling every previous attempt back just to measure the list.
  */
-export type ConceptSummary = {
-  id: string;
-  headline: string;
-  strategy_type: string | null;
-  generation_status: string | null;
-  created_at: string;
-};
+export type ConceptSummary = Pick<
+  AdConceptTable,
+  "id" | "headline" | "strategy_type" | "generation_status" | "created_at"
+>;
 
 /** Just enough to populate the Prompt Builder's concept picker. */
 export async function listConceptSummaries(): Promise<ConceptSummary[]> {
@@ -1131,23 +1172,30 @@ export async function listConceptSummaries(): Promise<ConceptSummary[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return data as ConceptSummary[];
+  return data;
 }
 
-export type ConceptPromptDetail = {
-  id: string;
-  headline: string;
-  strategy_type: string | null;
-  campaign_angle: string | null;
-  visual_direction: string;
-  final_generation_prompt: string | null;
-  generation_prompt_override: string | null;
+export type ConceptPromptDetail = Omit<
+  Pick<
+    AdConceptTable,
+    | "id"
+    | "headline"
+    | "strategy_type"
+    | "campaign_angle"
+    | "visual_direction"
+    | "final_generation_prompt"
+    | "generation_prompt_override"
+    | "structured_concept"
+    | "brand_asset_requirements"
+    | "promotional_message_id"
+    | "generation_status"
+    | "creative_image_path"
+  >,
+  "structured_concept"
+> & {
+  /** jsonb, so the generator can only say `Json`. */
   structured_concept: Record<string, unknown> | null;
-  brand_asset_requirements: string[];
-  promotional_message_id: string | null;
   promotional_message: { message: string } | null;
-  generation_status: string | null;
-  creative_image_path: string | null;
 };
 
 export async function getConceptPromptDetail(
@@ -1206,7 +1254,10 @@ export async function listGenerationsForConcept(
     .order("attempt_number", { ascending: true });
 
   if (error) throw error;
-  return data as unknown as CreativeGenerationRow[];
+  return data.map((row) => ({
+    ...row,
+    qa_scores: row.qa_scores as Record<string, number> | null,
+  }));
 }
 
 export async function updateConceptGenerationStatus(

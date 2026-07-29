@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import type { Tables } from "@/types/supabase";
 
-export type MetaAdAccountConnection = {
-  ad_account_id: string;
-  access_token: string;
-  token_expires_at: string;
-};
+export type MetaAdAccountConnection = Pick<
+  Tables<"meta_ad_account_connections">,
+  "ad_account_id" | "access_token" | "token_expires_at"
+>;
 
 export async function getConnection(): Promise<MetaAdAccountConnection | null> {
   const supabase = await createClient();

@@ -43,3 +43,6 @@ next-env.d.ts
 
 # claude code (local machine settings, not shared project config)
 .claude/settings.local.json
+
+# Supabase CLI scratch state (contains the linked project ref)
+supabase/.temp/
