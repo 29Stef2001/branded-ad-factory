@@ -1538,3 +1538,32 @@ export async function failStaleGenerations(): Promise<number> {
   if (error) throw error;
   return data?.length ?? 0;
 }
+
+export type GenerationProgress = {
+  status: string;
+  attemptNumber: number;
+  startedAt: string;
+} | null;
+
+/** The in-flight attempt for a concept, if there is one. */
+export async function getLatestGenerationProgress(
+  conceptId: string,
+): Promise<GenerationProgress> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("creative_generations")
+    .select("status, attempt_number, created_at")
+    .eq("concept_id", conceptId)
+    .order("attempt_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    status: data.status as string,
+    attemptNumber: data.attempt_number as number,
+    startedAt: data.created_at as string,
+  };
+}

@@ -13,6 +13,7 @@ import {
 } from "@/features/ad-concepts/application/save-generation-prompt";
 import { generateCreativeImageAction } from "@/features/ad-concepts/application/generate-creative-image";
 import { initialActionState } from "@/features/ad-concepts/application/types";
+import { GenerationProgress } from "@/features/ad-concepts/ui/generation-progress";
 
 export function PromptEditor({
   conceptId,
@@ -156,7 +157,7 @@ export function PromptEditor({
 
         <form action={generateAction}>
           <Button type="submit" size="sm" disabled={busy}>
-            {isGenerating ? "Generating… (up to 2 min)" : "Generate image"}
+            {isGenerating ? "Generating…" : "Generate image"}
           </Button>
         </form>
 
@@ -165,6 +166,8 @@ export function PromptEditor({
           edits.
         </p>
       </div>
+
+      <GenerationProgress conceptId={conceptId} active={isGenerating} />
     </DarkPanel>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { generateCreativeImageAction } from "@/features/ad-concepts/application/generate-creative-image";
 import { initialActionState } from "@/features/ad-concepts/application/types";
+import { GenerationProgress } from "@/features/ad-concepts/ui/generation-progress";
 
 export function GenerateCreativeImageForm({
   conceptId,
@@ -49,11 +50,13 @@ export function GenerateCreativeImageForm({
         className="self-start"
       >
         {isPending
-          ? "Generating... (up to a minute)"
+          ? "Generating…"
           : hasImage
-            ? "Regenerate Image"
-            : "Generate Image"}
+            ? "Regenerate image"
+            : "Generate image"}
       </Button>
+
+      <GenerationProgress conceptId={conceptId} active={isPending} />
     </form>
   );
 }
