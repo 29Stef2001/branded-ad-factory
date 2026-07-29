@@ -175,6 +175,7 @@ export type ConceptRow = Pick<
   | "brand_asset_requirements"
   | "generation_status"
   | "generation_retry_count"
+  | "concept_code"
 > & {
   competitor_ads: { competitors: { name: string } | null } | null;
   original: { headline: string } | null;
@@ -447,7 +448,7 @@ export async function insertConcepts(
 }
 
 const CONCEPT_ROW_SELECT =
-  "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, creative_image_path, product_image_url, strategy_type, campaign_angle, brand_asset_requirements, generation_status, generation_retry_count, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline), promotional_message:approved_promotional_messages(message)";
+  "id, headline, hook, body_copy, visual_direction, call_to_action, created_at, creative_image_path, product_image_url, strategy_type, campaign_angle, brand_asset_requirements, generation_status, generation_retry_count, concept_code, competitor_ads(competitors(name)), original:ad_concepts!refined_from_concept_id(headline), promotional_message:approved_promotional_messages(message)";
 
 export async function listConcepts(): Promise<ConceptRow[]> {
   const supabase = await createClient();
@@ -1248,7 +1249,7 @@ export async function listGenerationsForConcept(
   const { data, error } = await supabase
     .from("creative_generations")
     .select(
-      "id, concept_id, attempt_number, status, image_path, selected_reference_roles, qa_scores, qa_passed, qa_notes, qa_score, detected_issues, qa_suggested_prompt, reviewed_at, retry_reason, failure_reason, created_at",
+      "id, concept_id, attempt_number, status, image_path, selected_reference_roles, qa_scores, qa_passed, qa_notes, qa_score, detected_issues, qa_suggested_prompt, reviewed_at, retry_reason, failure_reason, created_at, perceptual_hash",
     )
     .eq("concept_id", conceptId)
     .order("attempt_number", { ascending: true });

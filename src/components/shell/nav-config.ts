@@ -1,4 +1,10 @@
-import { House, TrendingUp, Workflow, type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  House,
+  TrendingUp,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
 
 export type NavLeaf = {
   label: string;
@@ -60,6 +66,20 @@ export const NAV_TREE: NavEntry[] = [
       {
         label: "Launch in Meta",
         segment: "ad-factory/launch",
+      },
+    ],
+  },
+  {
+    // Creative Intelligence: the platform's shared performance layer. Only the
+    // pages that are actually built appear, per the rule the rest of the
+    // navigation already follows.
+    label: "Intelligence",
+    icon: BarChart3,
+    items: [
+      { label: "Creative Performance", segment: "intelligence" },
+      {
+        label: "Attribution",
+        segment: "intelligence/attribution",
       },
     ],
   },

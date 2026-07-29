@@ -57,6 +57,7 @@ function concept(overrides = {}) {
     competitor_ads: null,
     original: null,
     promotional_message: { message: "FINAL STOCK" },
+    concept_code: "CS-ABC234",
     ...overrides,
   };
 }

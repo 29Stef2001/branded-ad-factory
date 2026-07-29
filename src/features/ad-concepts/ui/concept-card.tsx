@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { StatusBadge } from "@/components/data/status-badge";
 import { ConfirmButton } from "@/components/data/confirm-button";
+import { ConceptCode } from "@/features/ad-concepts/ui/concept-code";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import {
   GENERATION_STATUS_LABELS,
@@ -45,6 +46,7 @@ export function ConceptCard({
       description={concept.hook}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          {concept.concept_code && <ConceptCode code={concept.concept_code} />}
           {concept.strategy_type && (
             <StatusBadge
               label={labelFor(STRATEGY_LABELS, concept.strategy_type)}

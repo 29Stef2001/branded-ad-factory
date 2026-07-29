@@ -159,3 +159,26 @@ export function canAutoConfirm(candidate: AttributionCandidate): boolean {
     candidate.method === "concept_code" || candidate.method === "api_created"
   );
 }
+
+/**
+ * Meta's delivery statuses, in plain words.
+ *
+ * `effective_status` is the one worth showing: `status` says what the ad itself
+ * is set to, while this accounts for the ad set and campaign above it — an
+ * active ad in a paused campaign is not running, and saying "Active" would be
+ * wrong.
+ */
+export const META_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Active",
+  PAUSED: "Paused",
+  DELETED: "Deleted",
+  ARCHIVED: "Archived",
+  PENDING_REVIEW: "In review",
+  DISAPPROVED: "Disapproved",
+  PREAPPROVED: "Pre-approved",
+  PENDING_BILLING_INFO: "Needs billing info",
+  CAMPAIGN_PAUSED: "Campaign paused",
+  ADSET_PAUSED: "Ad set paused",
+  IN_PROCESS: "Processing",
+  WITH_ISSUES: "Has issues",
+};

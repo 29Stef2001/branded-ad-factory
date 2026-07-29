@@ -65,6 +65,7 @@ export type Database = {
           brief: string
           call_to_action: string
           campaign_angle: string | null
+          concept_code: string | null
           created_at: string
           creative_image_path: string | null
           final_generation_prompt: string | null
@@ -75,6 +76,7 @@ export type Database = {
           hook: string
           id: string
           inspired_by_ad_id: string | null
+          origin: string
           product_image_url: string | null
           promotional_message_id: string | null
           refined_from_concept_id: string | null
@@ -89,6 +91,7 @@ export type Database = {
           brief: string
           call_to_action: string
           campaign_angle?: string | null
+          concept_code?: string | null
           created_at?: string
           creative_image_path?: string | null
           final_generation_prompt?: string | null
@@ -99,6 +102,7 @@ export type Database = {
           hook: string
           id?: string
           inspired_by_ad_id?: string | null
+          origin?: string
           product_image_url?: string | null
           promotional_message_id?: string | null
           refined_from_concept_id?: string | null
@@ -113,6 +117,7 @@ export type Database = {
           brief?: string
           call_to_action?: string
           campaign_angle?: string | null
+          concept_code?: string | null
           created_at?: string
           creative_image_path?: string | null
           final_generation_prompt?: string | null
@@ -123,6 +128,7 @@ export type Database = {
           hook?: string
           id?: string
           inspired_by_ad_id?: string | null
+          origin?: string
           product_image_url?: string | null
           promotional_message_id?: string | null
           refined_from_concept_id?: string | null
@@ -154,6 +160,1409 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ad_insights_daily: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_insights_daily_meta_entity_id_fkey"
+            columns: ["meta_entity_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_insights_daily_202507: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202508: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202509: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202510: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202511: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202512: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202601: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202602: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202603: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202604: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202605: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202606: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202607: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
+      }
+      ad_insights_daily_202608: {
+        Row: {
+          add_to_cart: number
+          add_to_cart_value: number
+          clicks: number
+          frequency: number | null
+          impressions: number
+          initiate_checkout: number
+          initiate_checkout_value: number
+          is_final: boolean
+          landing_page_views: number
+          leads: number
+          link_clicks: number
+          meta_entity_id: string
+          outbound_clicks: number
+          post_engagements: number
+          purchases: number
+          reach: number
+          registrations: number
+          revenue: number
+          spend: number
+          stat_date: string
+          synced_at: string
+          user_id: string
+          video_p100: number
+          video_p25: number
+          video_p50: number
+          video_p75: number
+          video_plays: number
+          video_thruplays: number
+        }
+        Insert: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date: string
+          synced_at?: string
+          user_id: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Update: {
+          add_to_cart?: number
+          add_to_cart_value?: number
+          clicks?: number
+          frequency?: number | null
+          impressions?: number
+          initiate_checkout?: number
+          initiate_checkout_value?: number
+          is_final?: boolean
+          landing_page_views?: number
+          leads?: number
+          link_clicks?: number
+          meta_entity_id?: string
+          outbound_clicks?: number
+          post_engagements?: number
+          purchases?: number
+          reach?: number
+          registrations?: number
+          revenue?: number
+          spend?: number
+          stat_date?: string
+          synced_at?: string
+          user_id?: string
+          video_p100?: number
+          video_p25?: number
+          video_p50?: number
+          video_p75?: number
+          video_plays?: number
+          video_thruplays?: number
+        }
+        Relationships: []
       }
       approved_promotional_messages: {
         Row: {
@@ -494,6 +1903,7 @@ export type Database = {
           failure_reason: string | null
           id: string
           image_path: string | null
+          perceptual_hash: string | null
           qa_notes: string | null
           qa_passed: boolean | null
           qa_score: number | null
@@ -513,6 +1923,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           image_path?: string | null
+          perceptual_hash?: string | null
           qa_notes?: string | null
           qa_passed?: boolean | null
           qa_score?: number | null
@@ -532,6 +1943,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           image_path?: string | null
+          perceptual_hash?: string | null
           qa_notes?: string | null
           qa_passed?: boolean | null
           qa_score?: number | null
@@ -552,6 +1964,226 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      creative_links: {
+        Row: {
+          concept_id: string
+          confirmed: boolean
+          confirmed_at: string | null
+          created_at: string
+          generation_id: string | null
+          id: string
+          match_confidence: number
+          match_method: string
+          meta_entity_id: string
+          user_id: string
+        }
+        Insert: {
+          concept_id: string
+          confirmed?: boolean
+          confirmed_at?: string | null
+          created_at?: string
+          generation_id?: string | null
+          id?: string
+          match_confidence: number
+          match_method: string
+          meta_entity_id: string
+          user_id: string
+        }
+        Update: {
+          concept_id?: string
+          confirmed?: boolean
+          confirmed_at?: string | null
+          created_at?: string
+          generation_id?: string | null
+          id?: string
+          match_confidence?: number
+          match_method?: string
+          meta_entity_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_links_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "ad_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_links_generation_id_fkey"
+            columns: ["generation_id"]
+            isOneToOne: false
+            referencedRelation: "creative_generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_links_meta_entity_id_fkey"
+            columns: ["meta_entity_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_metrics: {
+        Row: {
+          add_to_cart: number
+          clicks: number
+          composite_score: number | null
+          computed_at: string
+          concept_id: string | null
+          conversion_rate: number | null
+          cpa: number | null
+          cpc: number | null
+          cpm: number | null
+          ctr: number | null
+          ctr_lower_bound: number | null
+          evidence_tier: string
+          id: string
+          impressions: number
+          initiate_checkout: number
+          landing_page_views: number
+          link_clicks: number
+          link_ctr: number | null
+          meta_entity_id: string | null
+          percentile_rank: number | null
+          primary_metric: string | null
+          purchases: number
+          reach: number
+          revenue: number
+          roas: number | null
+          roas_shrunk: number | null
+          spend: number
+          user_id: string
+          window_days: number
+          window_end: string | null
+          window_start: string | null
+        }
+        Insert: {
+          add_to_cart?: number
+          clicks?: number
+          composite_score?: number | null
+          computed_at?: string
+          concept_id?: string | null
+          conversion_rate?: number | null
+          cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          ctr?: number | null
+          ctr_lower_bound?: number | null
+          evidence_tier: string
+          id?: string
+          impressions?: number
+          initiate_checkout?: number
+          landing_page_views?: number
+          link_clicks?: number
+          link_ctr?: number | null
+          meta_entity_id?: string | null
+          percentile_rank?: number | null
+          primary_metric?: string | null
+          purchases?: number
+          reach?: number
+          revenue?: number
+          roas?: number | null
+          roas_shrunk?: number | null
+          spend?: number
+          user_id: string
+          window_days: number
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          add_to_cart?: number
+          clicks?: number
+          composite_score?: number | null
+          computed_at?: string
+          concept_id?: string | null
+          conversion_rate?: number | null
+          cpa?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          ctr?: number | null
+          ctr_lower_bound?: number | null
+          evidence_tier?: string
+          id?: string
+          impressions?: number
+          initiate_checkout?: number
+          landing_page_views?: number
+          link_clicks?: number
+          link_ctr?: number | null
+          meta_entity_id?: string | null
+          percentile_rank?: number | null
+          primary_metric?: string | null
+          purchases?: number
+          reach?: number
+          revenue?: number
+          roas?: number | null
+          roas_shrunk?: number | null
+          spend?: number
+          user_id?: string
+          window_days?: number
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_metrics_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "ad_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_metrics_meta_entity_id_fkey"
+            columns: ["meta_entity_id"]
+            isOneToOne: false
+            referencedRelation: "meta_ad_entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_runs: {
+        Row: {
+          created_at: string
+          cursor: Json | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          job_name: string
+          processed_count: number
+          started_at: string
+          status: string
+          trigger: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cursor?: Json | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_name: string
+          processed_count?: number
+          started_at?: string
+          status: string
+          trigger: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cursor?: Json | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_name?: string
+          processed_count?: number
+          started_at?: string
+          status?: string
+          trigger?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       meta_ad_account_connections: {
         Row: {
@@ -576,6 +2208,63 @@ export type Database = {
           created_at?: string
           id?: string
           token_expires_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      meta_ad_entities: {
+        Row: {
+          created_at: string
+          creative_meta_id: string | null
+          effective_status: string | null
+          entity_type: string
+          first_seen_at: string
+          id: string
+          image_hash: string | null
+          last_synced_at: string
+          meta_id: string
+          name: string
+          parent_meta_id: string | null
+          perceptual_hash: string | null
+          status: string | null
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          creative_meta_id?: string | null
+          effective_status?: string | null
+          entity_type: string
+          first_seen_at?: string
+          id?: string
+          image_hash?: string | null
+          last_synced_at?: string
+          meta_id: string
+          name: string
+          parent_meta_id?: string | null
+          perceptual_hash?: string | null
+          status?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          creative_meta_id?: string | null
+          effective_status?: string | null
+          entity_type?: string
+          first_seen_at?: string
+          id?: string
+          image_hash?: string | null
+          last_synced_at?: string
+          meta_id?: string
+          name?: string
+          parent_meta_id?: string | null
+          perceptual_hash?: string | null
+          status?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -662,7 +2351,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ensure_insights_partition: {
+        Args: { target: string }
+        Returns: undefined
+      }
+      generate_concept_code: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
