@@ -46,9 +46,11 @@ export async function runSyncPass(
   options: {
     db?: Db;
     connection?: { ad_account_id: string; access_token: string };
+    /** Wall-clock budget for this pass. Defaults to a single-account run. */
+    budgetMs?: number;
   } = {},
 ): Promise<SyncOutcome> {
-  const { db, connection } = options;
+  const { db, connection, budgetMs = 40_000 } = options;
   const job = await claimJobRun(userId, JOB_NAME, trigger, db);
   if (!job) {
     return {
@@ -67,7 +69,7 @@ export async function runSyncPass(
     const step = await runSyncUntilBudget(
       userId,
       resumeFrom,
-      40_000,
+      budgetMs,
       db,
       connection,
     );
@@ -165,6 +167,7 @@ export async function runSyncPassAsJob(
   userId: string,
   connection: { ad_account_id: string; access_token: string },
   db: Db,
+  budgetMs?: number,
 ): Promise<SyncOutcome> {
-  return runSyncPass(userId, "cron", { db, connection });
+  return runSyncPass(userId, "cron", { db, connection, budgetMs });
 }

@@ -28,10 +28,21 @@ The service-role key is in the Supabase dashboard under Project Settings → API
 ## Why the job is built the way it is
 
 **Resumable.** Vercel Hobby stops a function at 60 seconds regardless of
-`maxDuration` — a limit image generation has already hit. Each pass works for
-40 seconds, writes a cursor, and returns `partial`; the next invocation picks up
+`maxDuration` — a limit image generation has already hit. Each pass works within
+its budget, writes a cursor, and returns `partial`; the next invocation picks up
 where it stopped. That is also what makes it work at a thousand ads rather than
 five.
+
+**Budgeted across accounts, not per account.** The handler holds a single 45s
+ceiling and divides what is left between the accounts still to do. Giving each
+account its own 40s meant three accounts asked for 120 and the function was
+killed partway through the second, losing the cursor it had not written yet.
+Accounts that do not fit are counted in `deferred` and picked up next run.
+
+A non-zero `deferred` means the schedule is not keeping up. On a plan that
+allows more frequent crons, run it more often; on Hobby, where cron is limited
+to once a day, a very large account may take several days to catch up from cold
+— or one press of "Sync now".
 
 **Idempotent.** Facts upsert on `(meta_entity_id, stat_date)`, so re-running a
 window corrects rows instead of duplicating them. Running the same sync twice is
