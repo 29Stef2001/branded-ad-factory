@@ -755,6 +755,39 @@ export async function downloadBrandAssetFile(
   };
 }
 
+/** Reads a stored creative back, for fingerprinting one generated before hashing existed. */
+export async function downloadConceptImage(
+  path: string,
+): Promise<Buffer | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage
+    .from(CREATIVE_IMAGES_BUCKET)
+    .download(path);
+
+  // A missing object is not worth failing a backfill over — the row simply
+  // stays unhashed and is skipped next time too.
+  if (error || !data) return null;
+  return Buffer.from(await data.arrayBuffer());
+}
+
+/** Generations with a stored image but no fingerprint yet. */
+export async function listGenerationsNeedingHash(
+  limit = 10,
+): Promise<{ id: string; image_path: string }[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("creative_generations")
+    .select("id, image_path")
+    .is("perceptual_hash", null)
+    .not("image_path", "is", null)
+    .limit(limit);
+
+  if (error) throw error;
+  return data.filter(
+    (row): row is { id: string; image_path: string } => row.image_path !== null,
+  );
+}
+
 export async function removeBrandAssetFile(path: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.storage

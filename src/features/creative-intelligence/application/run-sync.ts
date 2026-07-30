@@ -13,7 +13,10 @@ import {
   type SyncCursor,
 } from "@/features/creative-intelligence/application/sync-meta-data";
 import { attributeUnlinkedAds } from "@/features/creative-intelligence/application/attribute-creatives";
-import { hashAdThumbnails } from "@/features/creative-intelligence/application/hash-ad-thumbnails";
+import {
+  backfillConceptHashes,
+  hashAdThumbnails,
+} from "@/features/creative-intelligence/application/hash-ad-thumbnails";
 import { scoreAllWindows } from "@/features/creative-intelligence/application/score-creatives";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 import type { ActionState } from "@/features/ad-concepts/application/types";
@@ -89,6 +92,9 @@ export async function runSyncPass(
     // Before attribution, so the fallback path has fingerprints to compare
     // against on this same pass rather than the next one.
     const hashing = await hashAdThumbnails(userId, db);
+    // Our own side of the comparison. Runs through the session client, since
+    // Storage reads and creative_generations are already scoped by RLS.
+    const backfill = await backfillConceptHashes();
     const attribution = await attributeUnlinkedAds(userId, db);
     const scoring = await scoreAllWindows(userId, db);
 
@@ -113,6 +119,9 @@ export async function runSyncPass(
         `${attribution.autoConfirmed} linked automatically, ` +
         `${attribution.proposed - attribution.autoConfirmed} awaiting review, ` +
         `${attribution.unmatched} unmatched.` +
+        (backfill.hashed > 0
+          ? ` Fingerprinted ${backfill.hashed} of your own creative${backfill.hashed === 1 ? "" : "s"}.`
+          : "") +
         (hashing.hashed > 0
           ? ` Fingerprinted ${hashing.hashed} thumbnail${hashing.hashed === 1 ? "" : "s"}${hashing.remaining ? " (more next run)" : ""}.`
           : ""),

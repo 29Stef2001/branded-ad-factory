@@ -1,4 +1,12 @@
-import { perceptualHashFromUrl } from "@/features/creative-intelligence/infrastructure/image-hash-client";
+import {
+  perceptualHashFromImage,
+  perceptualHashFromUrl,
+} from "@/features/creative-intelligence/infrastructure/image-hash-client";
+import {
+  downloadConceptImage,
+  listGenerationsNeedingHash,
+  updateGenerationAttempt,
+} from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 import {
   listAdsNeedingHash,
   setEntityPerceptualHash,
@@ -54,4 +62,53 @@ export async function hashAdThumbnails(
   }
 
   return { hashed, failed, remaining: ads.length === BATCH_SIZE };
+}
+
+/**
+ * Fingerprints creatives generated before hashing existed.
+ *
+ * Without this the fallback has nothing on our side to compare against: the
+ * concepts already in the library carry no hash, so image matching could never
+ * fire however many Meta thumbnails were fingerprinted. Reads each image back
+ * out of Storage once and never again.
+ *
+ * Bounded and self-cursoring like the thumbnail pass — the absence of a hash is
+ * the queue.
+ */
+const BACKFILL_SIZE = 8;
+
+export async function backfillConceptHashes(): Promise<{
+  hashed: number;
+  failed: number;
+  remaining: boolean;
+}> {
+  const generations = await listGenerationsNeedingHash(BACKFILL_SIZE);
+  if (generations.length === 0)
+    return { hashed: 0, failed: 0, remaining: false };
+
+  let hashed = 0;
+  let failed = 0;
+
+  for (const generation of generations) {
+    const image = await downloadConceptImage(generation.image_path);
+    if (!image) {
+      failed += 1;
+      continue;
+    }
+
+    const hash = await perceptualHashFromImage(image);
+    if (!hash) {
+      failed += 1;
+      continue;
+    }
+
+    await updateGenerationAttempt(generation.id, { perceptualHash: hash });
+    hashed += 1;
+  }
+
+  return {
+    hashed,
+    failed,
+    remaining: generations.length === BACKFILL_SIZE,
+  };
 }
