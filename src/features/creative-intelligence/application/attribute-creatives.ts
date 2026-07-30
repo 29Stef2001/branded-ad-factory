@@ -12,6 +12,7 @@ import {
   listCreativeLinks,
   setLinkConfirmed,
   upsertCreativeLink,
+  type Db,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 import type { ActionState } from "@/features/ad-concepts/application/types";
@@ -28,11 +29,12 @@ const INTELLIGENCE_PATH = "/dashboard/intelligence/attribution";
  */
 export async function attributeUnlinkedAds(
   userId: string,
+  db?: Db,
 ): Promise<{ proposed: number; autoConfirmed: number; unmatched: number }> {
   const [ads, concepts, existing] = await Promise.all([
-    listAdEntities(),
-    listConceptsForMatching(),
-    listCreativeLinks(),
+    listAdEntities(userId, db),
+    listConceptsForMatching(userId, db),
+    listCreativeLinks(userId, db),
   ]);
 
   const linkedEntityIds = new Set(existing.map((link) => link.meta_entity_id));
@@ -64,13 +66,17 @@ export async function attributeUnlinkedAds(
     const best = candidates[0];
     const confirmed = canAutoConfirm(best);
 
-    await upsertCreativeLink(userId, {
-      metaEntityId: ad.id,
-      conceptId: best.conceptId,
-      matchMethod: best.method,
-      matchConfidence: best.confidence,
-      confirmed,
-    });
+    await upsertCreativeLink(
+      userId,
+      {
+        metaEntityId: ad.id,
+        conceptId: best.conceptId,
+        matchMethod: best.method,
+        matchConfidence: best.confidence,
+        confirmed,
+      },
+      db,
+    );
 
     proposed += 1;
     if (confirmed) autoConfirmed += 1;

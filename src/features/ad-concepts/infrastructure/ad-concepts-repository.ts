@@ -1126,6 +1126,7 @@ export async function updateGenerationAttempt(
     qaSuggestedPrompt?: string;
     reviewedAt?: string;
     failureReason?: string;
+    perceptualHash?: string;
   },
 ): Promise<void> {
   const supabase = await createClient();
@@ -1145,6 +1146,9 @@ export async function updateGenerationAttempt(
         qa_suggested_prompt: input.qaSuggestedPrompt,
       }),
       ...(input.reviewedAt !== undefined && { reviewed_at: input.reviewedAt }),
+      ...(input.perceptualHash !== undefined && {
+        perceptual_hash: input.perceptualHash,
+      }),
       ...(input.failureReason !== undefined && {
         failure_reason: input.failureReason,
       }),

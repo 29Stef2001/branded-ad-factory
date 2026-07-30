@@ -5,6 +5,7 @@ import {
   claimJobRun,
   finishJobRun,
   lastCursorFor,
+  type Db,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import {
   MetaNotConnectedError,
@@ -12,6 +13,7 @@ import {
   type SyncCursor,
 } from "@/features/creative-intelligence/application/sync-meta-data";
 import { attributeUnlinkedAds } from "@/features/creative-intelligence/application/attribute-creatives";
+import { hashAdThumbnails } from "@/features/creative-intelligence/application/hash-ad-thumbnails";
 import { scoreAllWindows } from "@/features/creative-intelligence/application/score-creatives";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 import type { ActionState } from "@/features/ad-concepts/application/types";
@@ -23,6 +25,7 @@ export type SyncOutcome = {
   processed: number;
   attributed?: number;
   scored?: number;
+  hashed?: number;
   message: string;
 };
 
@@ -37,8 +40,13 @@ export type SyncOutcome = {
 export async function runSyncPass(
   userId: string,
   trigger: "cron" | "manual",
+  options: {
+    db?: Db;
+    connection?: { ad_account_id: string; access_token: string };
+  } = {},
 ): Promise<SyncOutcome> {
-  const job = await claimJobRun(userId, JOB_NAME, trigger);
+  const { db, connection } = options;
+  const job = await claimJobRun(userId, JOB_NAME, trigger, db);
   if (!job) {
     return {
       status: "skipped",
@@ -48,15 +56,29 @@ export async function runSyncPass(
   }
 
   try {
-    const resumeFrom = (await lastCursorFor(JOB_NAME)) as SyncCursor | null;
-    const step = await runSyncUntilBudget(userId, resumeFrom);
+    const resumeFrom = (await lastCursorFor(
+      JOB_NAME,
+      userId,
+      db,
+    )) as SyncCursor | null;
+    const step = await runSyncUntilBudget(
+      userId,
+      resumeFrom,
+      40_000,
+      db,
+      connection,
+    );
 
     if (!step.done) {
-      await finishJobRun(job.id, {
-        status: "partial",
-        processedCount: step.processed,
-        cursor: step.cursor,
-      });
+      await finishJobRun(
+        job.id,
+        {
+          status: "partial",
+          processedCount: step.processed,
+          cursor: step.cursor,
+        },
+        db,
+      );
       return {
         status: "partial",
         processed: step.processed,
@@ -64,25 +86,36 @@ export async function runSyncPass(
       };
     }
 
-    const attribution = await attributeUnlinkedAds(userId);
-    const scoring = await scoreAllWindows(userId);
+    // Before attribution, so the fallback path has fingerprints to compare
+    // against on this same pass rather than the next one.
+    const hashing = await hashAdThumbnails(userId, db);
+    const attribution = await attributeUnlinkedAds(userId, db);
+    const scoring = await scoreAllWindows(userId, db);
 
-    await finishJobRun(job.id, {
-      status: "succeeded",
-      processedCount: step.processed,
-      cursor: null,
-    });
+    await finishJobRun(
+      job.id,
+      {
+        status: "succeeded",
+        processedCount: step.processed,
+        cursor: null,
+      },
+      db,
+    );
 
     return {
       status: "completed",
       processed: step.processed,
       attributed: attribution.autoConfirmed,
       scored: scoring.scored,
+      hashed: hashing.hashed,
       message:
         `Synced ${step.processed} rows, scored ${scoring.scored} creatives. ` +
         `${attribution.autoConfirmed} linked automatically, ` +
         `${attribution.proposed - attribution.autoConfirmed} awaiting review, ` +
-        `${attribution.unmatched} unmatched.`,
+        `${attribution.unmatched} unmatched.` +
+        (hashing.hashed > 0
+          ? ` Fingerprinted ${hashing.hashed} thumbnail${hashing.hashed === 1 ? "" : "s"}${hashing.remaining ? " (more next run)" : ""}.`
+          : ""),
     };
   } catch (error) {
     const message =
@@ -93,7 +126,7 @@ export async function runSyncPass(
           : String(error);
 
     console.error("Meta sync failed", { userId, error });
-    await finishJobRun(job.id, { status: "failed", error: message });
+    await finishJobRun(job.id, { status: "failed", error: message }, db);
 
     return { status: "failed", processed: 0, message };
   }
@@ -111,4 +144,18 @@ export async function syncNowAction(_prev: ActionState): Promise<ActionState> {
   return outcome.status === "failed"
     ? { status: "error", message: outcome.message }
     : { status: "success", message: outcome.message };
+}
+
+/**
+ * The cron entry point: one account, running as service role.
+ *
+ * A thin wrapper rather than a second implementation, so a scheduled sync and a
+ * hand-triggered one cannot drift apart in what they actually do.
+ */
+export async function runSyncPassAsJob(
+  userId: string,
+  connection: { ad_account_id: string; access_token: string },
+  db: Db,
+): Promise<SyncOutcome> {
+  return runSyncPass(userId, "cron", { db, connection });
 }

@@ -20,6 +20,10 @@ export const env = createEnv({
     // Optional so local development runs without it; the handler refuses to do
     // anything when it is unset, rather than defaulting to open.
     CRON_SECRET: z.string().min(16).optional(),
+    // Service-role key, used only by src/app/api/jobs/** — see
+    // src/lib/supabase/admin.ts. Optional so the app runs without it; the
+    // scheduled jobs refuse to start rather than silently reading nothing.
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
@@ -36,6 +40,7 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     SHOPIFY_STORE_HOSTNAME: process.env.SHOPIFY_STORE_HOSTNAME,
     CRON_SECRET: process.env.CRON_SECRET,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,

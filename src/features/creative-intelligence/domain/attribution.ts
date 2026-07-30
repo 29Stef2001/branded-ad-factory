@@ -68,8 +68,18 @@ export function hammingDistance(a: string, b: string): number | null {
  *
  * Meta re-encodes and resizes what it serves, so an exact checksum never
  * matches — which is why Meta's own `image_hash` cannot be compared directly to
- * ours. These bands are deliberately conservative: anything past `review` is
- * treated as no match rather than a weak one.
+ * ours.
+ *
+ * Measured against real transformations of a generated creative rather than
+ * guessed at:
+ *
+ *   resize 1024→600 + JPEG q72   distance 5    (what Meta does to an upload)
+ *   crop to 4:5 + JPEG q80       distance 10   (a placement crop)
+ *   an unrelated creative        distance 25
+ *
+ * So `auto` catches re-encoding, `review` catches a crop, and anything beyond
+ * is a different image. Conservative on purpose: past `review` is treated as no
+ * match at all rather than a weak one.
  */
 export const HASH_DISTANCE = {
   /** Confident enough to propose automatically. */

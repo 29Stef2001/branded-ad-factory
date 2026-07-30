@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { DailyInsight } from "@/features/creative-intelligence/domain/meta-metrics";
 import type { MetaEntity } from "@/features/creative-intelligence/infrastructure/meta-graph-client";
@@ -5,7 +6,7 @@ import type {
   CreativeScore,
   MetricTotals,
 } from "@/features/creative-intelligence/domain/scoring";
-import type { Tables } from "@/types/supabase";
+import type { Database, Tables } from "@/types/supabase";
 
 /**
  * The platform's single store of advertising performance.
@@ -16,6 +17,39 @@ import type { Tables } from "@/types/supabase";
  * source of truth for the data means one place to fix when the meaning of a
  * number changes.
  */
+
+/**
+ * Which Supabase client a call runs against.
+ *
+ * Interactive requests pass nothing and get the session-scoped client, where
+ * RLS does the scoping. Scheduled jobs pass the service-role client, because
+ * cron has no session and RLS would otherwise hide every row — those callers
+ * are responsible for filtering by user_id themselves, which is why every
+ * function taking `db` also takes the userId explicitly.
+ */
+export type Db = SupabaseClient<Database>;
+
+/** PostgREST's own ceiling is 1000; paging at that size minimises round trips. */
+const PAGE_SIZE = 1000;
+
+/**
+ * Scopes a query to one user when the caller supplied an id.
+ *
+ * Interactive calls omit it and lean on RLS. Scheduled jobs run as service
+ * role, where RLS is off — so they pass the id and this applies the filter that
+ * would otherwise be missing. Applying it unconditionally would break the UI
+ * path, which has no id to give.
+ */
+function scopedToUser<T extends { eq: (column: string, value: string) => T }>(
+  query: T,
+  userId: string | undefined,
+): T {
+  return userId ? query.eq("user_id", userId) : query;
+}
+
+async function resolve(db?: Db): Promise<Db> {
+  return db ?? ((await createClient()) as unknown as Db);
+}
 
 type MetaAdEntityTable = Tables<"meta_ad_entities">;
 type CreativeLinkTable = Tables<"creative_links">;
@@ -86,9 +120,10 @@ export type CreativeMetricRow = Pick<
 export async function upsertMetaEntities(
   userId: string,
   entities: MetaEntity[],
+  db?: Db,
 ): Promise<void> {
   if (entities.length === 0) return;
-  const supabase = await createClient();
+  const supabase = await resolve(db);
 
   const { error } = await supabase.from("meta_ad_entities").upsert(
     entities.map((entity) => ({
@@ -112,30 +147,76 @@ export async function upsertMetaEntities(
 }
 
 /** Ad-level entities, which are the only ones attribution and scoring care about. */
-export async function listAdEntities(): Promise<MetaAdEntityRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("meta_ad_entities")
-    .select(
-      "id, entity_type, meta_id, parent_meta_id, name, status, effective_status, creative_meta_id, thumbnail_url, perceptual_hash",
-    )
-    .eq("entity_type", "ad")
-    .order("name", { ascending: true });
+export async function listAdEntities(
+  userId?: string,
+  db?: Db,
+): Promise<MetaAdEntityRow[]> {
+  const supabase = await resolve(db);
+  const { data, error } = await scopedToUser(
+    supabase
+      .from("meta_ad_entities")
+      .select(
+        "id, entity_type, meta_id, parent_meta_id, name, status, effective_status, creative_meta_id, thumbnail_url, perceptual_hash",
+      )
+      .eq("entity_type", "ad"),
+    userId,
+  ).order("name", { ascending: true });
 
   if (error) throw error;
   return data;
 }
 
 /** Meta ad id → our row id, for keying insights without a second round trip. */
-export async function mapMetaAdIdsToEntityIds(): Promise<Map<string, string>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("meta_ad_entities")
-    .select("id, meta_id")
-    .eq("entity_type", "ad");
+export async function mapMetaAdIdsToEntityIds(
+  userId?: string,
+  db?: Db,
+): Promise<Map<string, string>> {
+  const supabase = await resolve(db);
+  const { data, error } = await scopedToUser(
+    supabase
+      .from("meta_ad_entities")
+      .select("id, meta_id")
+      .eq("entity_type", "ad"),
+    userId,
+  );
 
   if (error) throw error;
   return new Map(data.map((row) => [row.meta_id, row.id]));
+}
+
+/** Ads we could fingerprint but have not yet. */
+export async function listAdsNeedingHash(
+  userId?: string,
+  db?: Db,
+  limit = 25,
+): Promise<{ id: string; thumbnail_url: string | null }[]> {
+  const supabase = await resolve(db);
+  const { data, error } = await scopedToUser(
+    supabase
+      .from("meta_ad_entities")
+      .select("id, thumbnail_url")
+      .eq("entity_type", "ad")
+      .is("perceptual_hash", null)
+      .not("thumbnail_url", "is", null),
+    userId,
+  ).limit(limit);
+
+  if (error) throw error;
+  return data;
+}
+
+export async function setEntityPerceptualHash(
+  entityId: string,
+  hash: string,
+  db?: Db,
+): Promise<void> {
+  const supabase = await resolve(db);
+  const { error } = await supabase
+    .from("meta_ad_entities")
+    .update({ perceptual_hash: hash })
+    .eq("id", entityId);
+
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +224,11 @@ export async function mapMetaAdIdsToEntityIds(): Promise<Map<string, string>> {
 // ---------------------------------------------------------------------------
 
 /** Creates the monthly partition covering a date, if it does not exist yet. */
-export async function ensureInsightsPartition(statDate: string): Promise<void> {
-  const supabase = await createClient();
+export async function ensureInsightsPartition(
+  statDate: string,
+  db?: Db,
+): Promise<void> {
+  const supabase = await resolve(db);
   const { error } = await supabase.rpc("ensure_insights_partition", {
     target: statDate,
   });
@@ -161,9 +245,10 @@ export async function ensureInsightsPartition(statDate: string): Promise<void> {
 export async function upsertDailyInsights(
   userId: string,
   rows: (DailyInsight & { metaEntityId: string; isFinal: boolean })[],
+  db?: Db,
 ): Promise<void> {
   if (rows.length === 0) return;
-  const supabase = await createClient();
+  const supabase = await resolve(db);
 
   const { error } = await supabase.from("ad_insights_daily").upsert(
     rows.map((row) => ({
@@ -216,14 +301,19 @@ export type EntityTotals = MetricTotals & {
  */
 export async function totalsByEntity(
   windowDays: number,
+  userId?: string,
+  db?: Db,
 ): Promise<EntityTotals[]> {
-  const supabase = await createClient();
+  const supabase = await resolve(db);
 
-  let query = supabase
-    .from("ad_insights_daily")
-    .select(
-      "meta_entity_id, stat_date, impressions, clicks, link_clicks, spend, purchases, revenue, add_to_cart, initiate_checkout, landing_page_views",
-    );
+  let query = scopedToUser(
+    supabase
+      .from("ad_insights_daily")
+      .select(
+        "meta_entity_id, stat_date, impressions, clicks, link_clicks, spend, purchases, revenue, add_to_cart, initiate_checkout, landing_page_views",
+      ),
+    userId,
+  );
 
   if (windowDays > 0) {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000)
@@ -232,11 +322,36 @@ export async function totalsByEntity(
     query = query.gte("stat_date", since);
   }
 
-  const { data, error } = await query;
-  if (error) throw error;
+  // Paged explicitly. PostgREST caps a response at 1000 rows, and this table
+  // grows by one row per ad per day — 38 ads over a 28-day window is already
+  // past the cap. Without paging the totals would silently be computed from
+  // part of the data and still look entirely plausible, which is the worst
+  // shape a bug can take in a system whose whole job is measurement.
+  type InsightRow = {
+    meta_entity_id: string;
+    stat_date: string;
+    impressions: number;
+    clicks: number;
+    link_clicks: number;
+    spend: number;
+    purchases: number;
+    revenue: number;
+    add_to_cart: number;
+    initiate_checkout: number;
+    landing_page_views: number;
+  };
+
+  const rows: InsightRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
 
   const byEntity = new Map<string, EntityTotals>();
-  for (const row of data) {
+  for (const row of rows) {
     const existing = byEntity.get(row.meta_entity_id) ?? {
       metaEntityId: row.meta_entity_id,
       conceptId: null,
@@ -289,14 +404,17 @@ export type ConceptForMatchingRow = {
 };
 
 /** Concepts an ad could belong to, with what attribution matches against. */
-export async function listConceptsForMatching(): Promise<
-  ConceptForMatchingRow[]
-> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("ad_concepts")
-    .select("id, concept_code, creative_generations(perceptual_hash)")
-    .order("created_at", { ascending: false });
+export async function listConceptsForMatching(
+  userId?: string,
+  db?: Db,
+): Promise<ConceptForMatchingRow[]> {
+  const supabase = await resolve(db);
+  const { data, error } = await scopedToUser(
+    supabase
+      .from("ad_concepts")
+      .select("id, concept_code, creative_generations(perceptual_hash)"),
+    userId,
+  ).order("created_at", { ascending: false });
 
   if (error) throw error;
 
@@ -324,8 +442,9 @@ export async function upsertCreativeLink(
     matchConfidence: number;
     confirmed: boolean;
   },
+  db?: Db,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await resolve(db);
   const { error } = await supabase.from("creative_links").upsert(
     {
       user_id: userId,
@@ -342,14 +461,19 @@ export async function upsertCreativeLink(
   if (error) throw error;
 }
 
-export async function listCreativeLinks(): Promise<CreativeLinkRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("creative_links")
-    .select(
-      "id, meta_entity_id, concept_id, match_method, match_confidence, confirmed, created_at",
-    )
-    .order("created_at", { ascending: false });
+export async function listCreativeLinks(
+  userId?: string,
+  db?: Db,
+): Promise<CreativeLinkRow[]> {
+  const supabase = await resolve(db);
+  const { data, error } = await scopedToUser(
+    supabase
+      .from("creative_links")
+      .select(
+        "id, meta_entity_id, concept_id, match_method, match_confidence, confirmed, created_at",
+      ),
+    userId,
+  ).order("created_at", { ascending: false });
 
   if (error) throw error;
   return data;
@@ -359,7 +483,7 @@ export async function setLinkConfirmed(
   linkId: string,
   confirmed: boolean,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await resolve();
   const { error } = await supabase
     .from("creative_links")
     .update({
@@ -372,7 +496,7 @@ export async function setLinkConfirmed(
 }
 
 export async function deleteCreativeLink(linkId: string): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await resolve();
   const { error } = await supabase
     .from("creative_links")
     .delete()
@@ -393,9 +517,10 @@ export async function upsertCreativeMetrics(
     totals: MetricTotals;
     percentileRank: number | null;
   })[],
+  db?: Db,
 ): Promise<void> {
   if (rows.length === 0) return;
-  const supabase = await createClient();
+  const supabase = await resolve(db);
 
   const { error } = await supabase.from("creative_metrics").upsert(
     rows.map((row) => ({
@@ -427,7 +552,11 @@ export async function upsertCreativeMetrics(
       percentile_rank: row.percentileRank,
       computed_at: new Date().toISOString(),
     })),
-    { onConflict: "concept_id,meta_entity_id,window_days" },
+    // Keyed on the ad and the window only. concept_id was in this key and
+    // is nullable, and Postgres treats NULLs as distinct in a unique
+    // constraint — so an unattributed ad never matched and every sync
+    // inserted a duplicate set.
+    { onConflict: "meta_entity_id,window_days" },
   );
 
   if (error) throw error;
@@ -446,7 +575,7 @@ export async function listScoredCreatives(windowDays = 30): Promise<
     ad_name: string | null;
   })[]
 > {
-  const supabase = await createClient();
+  const supabase = await resolve();
   const { data, error } = await supabase
     .from("creative_metrics")
     .select(
@@ -511,8 +640,9 @@ export async function claimJobRun(
   userId: string,
   jobName: string,
   trigger: "cron" | "manual",
+  db?: Db,
 ): Promise<JobRunRow | null> {
-  const supabase = await createClient();
+  const supabase = await resolve(db);
   const { data, error } = await supabase
     .from("job_runs")
     .insert({ user_id: userId, job_name: jobName, status: "running", trigger })
@@ -535,8 +665,9 @@ export async function finishJobRun(
     cursor?: unknown;
     error?: string;
   },
+  db?: Db,
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = await resolve(db);
   const { error } = await supabase
     .from("job_runs")
     .update({
@@ -555,12 +686,14 @@ export async function finishJobRun(
 /** The cursor a partial run left behind, so the next invocation resumes. */
 export async function lastCursorFor(
   jobName: string,
+  userId?: string,
+  db?: Db,
 ): Promise<Record<string, unknown> | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("job_runs")
-    .select("cursor, status")
-    .eq("job_name", jobName)
+  const supabase = await resolve(db);
+  const { data, error } = await scopedToUser(
+    supabase.from("job_runs").select("cursor, status").eq("job_name", jobName),
+    userId,
+  )
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -571,7 +704,7 @@ export async function lastCursorFor(
 }
 
 export async function listRecentJobRuns(limit = 10): Promise<JobRunRow[]> {
-  const supabase = await createClient();
+  const supabase = await resolve();
   const { data, error } = await supabase
     .from("job_runs")
     .select(

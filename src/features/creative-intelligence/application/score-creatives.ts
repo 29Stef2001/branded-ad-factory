@@ -8,6 +8,7 @@ import {
   listCreativeLinks,
   totalsByEntity,
   upsertCreativeMetrics,
+  type Db,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 
 /**
@@ -28,10 +29,11 @@ function daysBetween(from: string, to = new Date()): number {
 export async function scoreWindow(
   userId: string,
   windowDays: number,
+  db?: Db,
 ): Promise<{ scored: number; attributed: number }> {
   const [totals, links] = await Promise.all([
-    totalsByEntity(windowDays),
-    listCreativeLinks(),
+    totalsByEntity(windowDays, userId, db),
+    listCreativeLinks(userId, db),
   ]);
 
   // Only confirmed links attribute a creative. An unconfirmed proposal is a
@@ -77,7 +79,7 @@ export async function scoreWindow(
     row.percentileRank = ranks.get(row.metaEntityId) ?? null;
   }
 
-  await upsertCreativeMetrics(userId, scored);
+  await upsertCreativeMetrics(userId, scored, db);
 
   return {
     scored: scored.length,
@@ -87,6 +89,7 @@ export async function scoreWindow(
 
 export async function scoreAllWindows(
   userId: string,
+  db?: Db,
 ): Promise<{ scored: number; attributed: number }> {
   let scored = 0;
   let attributed = 0;
@@ -94,7 +97,7 @@ export async function scoreAllWindows(
   // Sequential rather than parallel: these all write the same table, and four
   // concurrent upserts of the same rows is a deadlock waiting to happen.
   for (const windowDays of SCORING_WINDOWS) {
-    const result = await scoreWindow(userId, windowDays);
+    const result = await scoreWindow(userId, windowDays, db);
     if (windowDays === 30) {
       scored = result.scored;
       attributed = result.attributed;

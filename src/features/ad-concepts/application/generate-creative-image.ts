@@ -32,6 +32,7 @@ import {
   updateGenerationAttempt,
   uploadConceptImage,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import { perceptualHashFromImage } from "@/features/creative-intelligence/infrastructure/image-hash-client";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 import type { ActionState } from "@/features/ad-concepts/application/types";
 
@@ -226,7 +227,13 @@ export async function generateCreativeImageAction(
     );
 
     const path = `${userId}/${conceptId}.png`;
-    await uploadConceptImage(path, image);
+    // Hashed here rather than in a later job: this is the only moment the
+    // original bytes exist in memory. Re-downloading every creative to
+    // fingerprint it afterwards would cost storage reads for no reason.
+    const [perceptualHash] = await Promise.all([
+      perceptualHashFromImage(image),
+      uploadConceptImage(path, image),
+    ]);
     await setConceptImagePath(conceptId, path);
     if (productImageUrl) {
       await setConceptProductImageUrl(conceptId, productImageUrl);
@@ -235,6 +242,7 @@ export async function generateCreativeImageAction(
     await updateGenerationAttempt(attemptId, {
       status: "generated",
       imagePath: path,
+      ...(perceptualHash ? { perceptualHash } : {}),
     });
 
     // QA runs after the image is stored, never before: a review failure must

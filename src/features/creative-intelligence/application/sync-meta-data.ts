@@ -16,6 +16,7 @@ import {
   upsertMetaEntities,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
+import type { Db } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 
 /**
  * Ingestion. Mirrors the account, then pulls daily facts for the restatement
@@ -65,8 +66,12 @@ function isoDate(daysAgo: number): string {
 export async function runSyncStep(
   userId: string,
   cursor: SyncCursor | null,
+  db?: Db,
+  connectionOverride?: { ad_account_id: string; access_token: string },
 ): Promise<SyncStep> {
-  const connection = await getConnection();
+  // Jobs pass the connection in: getConnection() reads through RLS, which a
+  // service-role caller does not have.
+  const connection = connectionOverride ?? (await getConnection());
   if (!connection) throw new MetaNotConnectedError();
 
   const { ad_account_id: adAccountId, access_token: accessToken } = connection;
@@ -79,7 +84,7 @@ export async function runSyncStep(
         accessToken,
         current.after,
       );
-      await upsertMetaEntities(userId, page.items);
+      await upsertMetaEntities(userId, page.items, db);
       return {
         cursor: page.nextCursor
           ? { phase: "campaigns", after: page.nextCursor }
@@ -91,7 +96,7 @@ export async function runSyncStep(
 
     case "adsets": {
       const page = await fetchAdSets(adAccountId, accessToken, current.after);
-      await upsertMetaEntities(userId, page.items);
+      await upsertMetaEntities(userId, page.items, db);
       return {
         cursor: page.nextCursor
           ? { phase: "adsets", after: page.nextCursor }
@@ -103,7 +108,7 @@ export async function runSyncStep(
 
     case "ads": {
       const page = await fetchAds(adAccountId, accessToken, current.after);
-      await upsertMetaEntities(userId, page.items);
+      await upsertMetaEntities(userId, page.items, db);
       return {
         cursor: page.nextCursor
           ? { phase: "ads", after: page.nextCursor }
@@ -132,14 +137,14 @@ export async function runSyncStep(
           until,
           current.after,
         ),
-        mapMetaAdIdsToEntityIds(),
+        mapMetaAdIdsToEntityIds(userId, db),
       ]);
 
       // A partition has to exist before the upsert, and the window can span a
       // month boundary.
       await Promise.all(
         [...new Set(page.items.map((row) => row.statDate.slice(0, 7)))].map(
-          (month) => ensureInsightsPartition(`${month}-01`),
+          (month) => ensureInsightsPartition(`${month}-01`, db),
         ),
       );
 
@@ -154,7 +159,7 @@ export async function runSyncStep(
         })
         .filter((row): row is NonNullable<typeof row> => row !== null);
 
-      await upsertDailyInsights(userId, rows);
+      await upsertDailyInsights(userId, rows, db);
 
       return {
         cursor: page.nextCursor
@@ -181,13 +186,15 @@ export async function runSyncUntilBudget(
   userId: string,
   startCursor: SyncCursor | null,
   budgetMs = 40_000,
+  db?: Db,
+  connectionOverride?: { ad_account_id: string; access_token: string },
 ): Promise<SyncStep> {
   const deadline = Date.now() + budgetMs;
   let cursor = startCursor;
   let processed = 0;
 
   for (;;) {
-    const step = await runSyncStep(userId, cursor);
+    const step = await runSyncStep(userId, cursor, db, connectionOverride);
     processed += step.processed;
     cursor = step.cursor;
 
