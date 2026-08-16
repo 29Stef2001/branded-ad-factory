@@ -5,6 +5,7 @@ import {
   claimJobRun,
   finishJobRun,
   lastCursorFor,
+  listSelectedAdAccounts,
   type Db,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import {
@@ -13,6 +14,7 @@ import {
   type SyncCursor,
 } from "@/features/creative-intelligence/application/sync-meta-data";
 import { attributeUnlinkedAds } from "@/features/creative-intelligence/application/attribute-creatives";
+import { discoverAccountsAndPages } from "@/features/creative-intelligence/application/discover-accounts";
 import {
   backfillConceptHashes,
   hashAdThumbnails,
@@ -61,6 +63,16 @@ export async function runSyncPass(
   }
 
   try {
+    // Refresh the catalogue first: an account selected in the UI must exist as
+    // a row before the sync can be told to walk it, and a newly added account
+    // should not have to wait a day to be noticed.
+    if (connection) {
+      await discoverAccountsAndPages(userId, connection, db);
+    }
+
+    const selected = await listSelectedAdAccounts(userId, db);
+    const accountIds = selected.map((account) => account.ad_account_id);
+
     const resumeFrom = (await lastCursorFor(
       JOB_NAME,
       userId,
@@ -72,6 +84,7 @@ export async function runSyncPass(
       budgetMs,
       db,
       connection,
+      accountIds,
     );
 
     if (!step.done) {
@@ -117,7 +130,8 @@ export async function runSyncPass(
       scored: scoring.scored,
       hashed: hashing.hashed,
       message:
-        `Synced ${step.processed} rows, scored ${scoring.scored} creatives. ` +
+        `Synced ${step.processed} rows across ${accountIds.length || 1} account${accountIds.length === 1 ? "" : "s"}, ` +
+        `scored ${scoring.scored} creatives. ` +
         `${attribution.autoConfirmed} linked automatically, ` +
         `${attribution.proposed - attribution.autoConfirmed} awaiting review, ` +
         `${attribution.unmatched} unmatched.` +

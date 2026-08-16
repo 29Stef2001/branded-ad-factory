@@ -35,6 +35,14 @@ export type SyncCursor = {
   /** Insights only: the window being fetched, fixed at the start of the phase. */
   since?: string;
   until?: string;
+  /**
+   * Which selected account this cursor is partway through.
+   *
+   * Position rather than id, so a run that is interrupted resumes on the same
+   * account. Storing the id instead would strand the cursor if that account
+   * were deselected between invocations.
+   */
+  accountIndex?: number;
 };
 
 export type SyncStep = {
@@ -68,14 +76,38 @@ export async function runSyncStep(
   cursor: SyncCursor | null,
   db?: Db,
   connectionOverride?: { ad_account_id: string; access_token: string },
+  accounts?: string[],
 ): Promise<SyncStep> {
   // Jobs pass the connection in: getConnection() reads through RLS, which a
   // service-role caller does not have.
   const connection = connectionOverride ?? (await getConnection());
   if (!connection) throw new MetaNotConnectedError();
 
-  const { ad_account_id: adAccountId, access_token: accessToken } = connection;
-  const current: SyncCursor = cursor ?? { phase: "campaigns" };
+  const { access_token: accessToken } = connection;
+  const current: SyncCursor = cursor ?? { phase: "campaigns", accountIndex: 0 };
+
+  // The account list is the selection; the connection's own ad_account_id is
+  // only the fallback for a workspace that has not chosen yet.
+  const accountIds =
+    accounts && accounts.length > 0 ? accounts : [connection.ad_account_id];
+  const accountIndex = current.accountIndex ?? 0;
+  const adAccountId = accountIds[accountIndex];
+
+  // Ran past the end of the list: every selected account has been walked.
+  if (!adAccountId) {
+    return { cursor: { phase: "done" }, processed: 0, done: true };
+  }
+
+  /**
+   * Moves to the next account, or finishes.
+   *
+   * Each account restarts at `campaigns` because the phases describe one
+   * account's objects, not the run as a whole.
+   */
+  const nextAccount = (): SyncCursor =>
+    accountIndex + 1 < accountIds.length
+      ? { phase: "campaigns", accountIndex: accountIndex + 1 }
+      : { phase: "done" };
 
   switch (current.phase) {
     case "campaigns": {
@@ -84,11 +116,11 @@ export async function runSyncStep(
         accessToken,
         current.after,
       );
-      await upsertMetaEntities(userId, page.items, db);
+      await upsertMetaEntities(userId, page.items, db, adAccountId);
       return {
         cursor: page.nextCursor
-          ? { phase: "campaigns", after: page.nextCursor }
-          : { phase: "adsets" },
+          ? { phase: "campaigns", after: page.nextCursor, accountIndex }
+          : { phase: "adsets", accountIndex },
         processed: page.items.length,
         done: false,
       };
@@ -96,11 +128,11 @@ export async function runSyncStep(
 
     case "adsets": {
       const page = await fetchAdSets(adAccountId, accessToken, current.after);
-      await upsertMetaEntities(userId, page.items, db);
+      await upsertMetaEntities(userId, page.items, db, adAccountId);
       return {
         cursor: page.nextCursor
-          ? { phase: "adsets", after: page.nextCursor }
-          : { phase: "ads" },
+          ? { phase: "adsets", after: page.nextCursor, accountIndex }
+          : { phase: "ads", accountIndex },
         processed: page.items.length,
         done: false,
       };
@@ -108,12 +140,13 @@ export async function runSyncStep(
 
     case "ads": {
       const page = await fetchAds(adAccountId, accessToken, current.after);
-      await upsertMetaEntities(userId, page.items, db);
+      await upsertMetaEntities(userId, page.items, db, adAccountId);
       return {
         cursor: page.nextCursor
-          ? { phase: "ads", after: page.nextCursor }
+          ? { phase: "ads", after: page.nextCursor, accountIndex }
           : {
               phase: "insights",
+              accountIndex,
               // Fixed now rather than recomputed per page, so a sync that
               // straddles midnight does not shift its own window and leave a
               // day unfetched.
@@ -155,7 +188,12 @@ export async function runSyncStep(
           // than invented — it will arrive on the next run once the entity
           // phase has caught up.
           if (!metaEntityId) return null;
-          return { ...row, metaEntityId, isFinal: isFinal(row.statDate) };
+          return {
+            ...row,
+            metaEntityId,
+            isFinal: isFinal(row.statDate),
+            adAccountId,
+          };
         })
         .filter((row): row is NonNullable<typeof row> => row !== null);
 
@@ -163,10 +201,17 @@ export async function runSyncStep(
 
       return {
         cursor: page.nextCursor
-          ? { phase: "insights", after: page.nextCursor, since, until }
-          : { phase: "done" },
+          ? {
+              phase: "insights",
+              after: page.nextCursor,
+              since,
+              until,
+              accountIndex,
+            }
+          : nextAccount(),
         processed: rows.length,
-        done: !page.nextCursor,
+        // Only truly done once the last selected account has been walked.
+        done: !page.nextCursor && accountIndex + 1 >= accountIds.length,
       };
     }
 
@@ -188,13 +233,20 @@ export async function runSyncUntilBudget(
   budgetMs = 40_000,
   db?: Db,
   connectionOverride?: { ad_account_id: string; access_token: string },
+  accounts?: string[],
 ): Promise<SyncStep> {
   const deadline = Date.now() + budgetMs;
   let cursor = startCursor;
   let processed = 0;
 
   for (;;) {
-    const step = await runSyncStep(userId, cursor, db, connectionOverride);
+    const step = await runSyncStep(
+      userId,
+      cursor,
+      db,
+      connectionOverride,
+      accounts,
+    );
     processed += step.processed;
     cursor = step.cursor;
 

@@ -77,6 +77,7 @@ export const NAV_TREE: NavEntry[] = [
     icon: BarChart3,
     items: [
       { label: "Creative Performance", segment: "intelligence" },
+      { label: "Ad Accounts", segment: "intelligence/accounts" },
       {
         label: "Attribution",
         segment: "intelligence/attribution",
