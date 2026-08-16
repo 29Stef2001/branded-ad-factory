@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { isRevokedTokenError } from "@/features/ad-launch/infrastructure/meta-capability-client";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge, type StatusTone } from "@/components/data/status-badge";
 import type { LaunchStatus } from "@/features/ad-launch/application/get-launch-status";
@@ -113,23 +114,58 @@ function StatusExplanation({ status }: { status: LaunchStatus }) {
               stays read-only — there is no button here that would work.
             </>
           }
-        />
-      );
-
-    case "capability_unknown":
-      return (
-        <Setup
-          title="Could not confirm what this connection may do."
-          body={
-            <>
-              The permission check did not complete:{" "}
-              <span className="text-foreground">{status.reason}</span>.
-              Launching stays disabled rather than guessing — an assumed
-              permission is how you end up with a half-created campaign.
-            </>
+          action={
+            <Link
+              href="/dashboard/performance"
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              Review permissions
+            </Link>
           }
         />
       );
+
+    case "capability_unknown": {
+      // A revoked token lands here, and previously offered no way out: the
+      // panel explained that the check failed and stopped. Removing the
+      // Business Integration on Meta's side is the common cause, and
+      // reconnecting is the only repair — so say that, and link to it.
+      const revoked = isRevokedTokenError(status.reason);
+
+      return (
+        <Setup
+          title={
+            revoked
+              ? "This Meta connection has been revoked."
+              : "Could not confirm what this connection may do."
+          }
+          body={
+            revoked ? (
+              <>
+                Meta reports the app is no longer authorised, which usually
+                means the Business Integration was removed. Reconnect to
+                authorise it again — the new token replaces the old one.
+              </>
+            ) : (
+              <>
+                The permission check did not complete:{" "}
+                <span className="text-foreground">{status.reason}</span>.
+                Launching stays disabled rather than guessing — an assumed
+                permission is how you end up with a half-created campaign.
+              </>
+            )
+          }
+          action={
+            <Link
+              href="/dashboard/performance"
+              className={buttonVariants({ size: "sm" })}
+            >
+              Reconnect Meta
+            </Link>
+          }
+        />
+      );
+    }
 
     case "ready":
       return (
