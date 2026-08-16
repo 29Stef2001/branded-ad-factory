@@ -1,5 +1,5 @@
 import { RefreshCw } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 /**
  * Starts a fresh Facebook Login for Business flow.
@@ -13,6 +13,10 @@ import { Button, buttonVariants } from "@/components/ui/button";
  *
  * The new token replaces the old one: the connection upserts on user_id, so
  * there is never a moment with two tokens and no way to tell which is live.
+ *
+ * Styled as an anchor rather than wrapped in `Button`. `Button` renders a
+ * native <button> and warns when it is asked to render something else — the
+ * same reason the launch panel applies these variants to its links directly.
  */
 export function ReconnectMetaButton({
   label = "Reconnect Meta",
@@ -22,18 +26,12 @@ export function ReconnectMetaButton({
   variant?: "default" | "outline";
 }) {
   return (
-    <Button
-      variant={variant}
-      size="sm"
-      render={
-        <a
-          href="/api/meta/oauth/start"
-          className={buttonVariants({ size: "sm", variant })}
-        >
-          <RefreshCw aria-hidden className="size-3.5" />
-          {label}
-        </a>
-      }
-    />
+    <a
+      href="/api/meta/oauth/start"
+      className={buttonVariants({ size: "sm", variant })}
+    >
+      <RefreshCw aria-hidden className="size-3.5" />
+      {label}
+    </a>
   );
 }
