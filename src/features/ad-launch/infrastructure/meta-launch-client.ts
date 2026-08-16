@@ -290,6 +290,137 @@ export async function uploadAdImage(
   return hash;
 }
 
+/** Conversion pixels on the account, for the ad set's promoted_object. */
+export type PixelSummary = { id: string; name: string };
+
+export async function listPixels(
+  adAccountId: string,
+  accessToken: string,
+): Promise<PixelSummary[]> {
+  const params = new URLSearchParams({
+    fields: "id,name",
+    limit: "100",
+    access_token: accessToken,
+  });
+
+  const response = await fetch(
+    `${GRAPH_BASE}/${adAccountId}/adspixels?${params.toString()}`,
+  );
+  const body = await response.json();
+  if (!response.ok || body.error) throw toLaunchError(body);
+
+  return (body.data ?? []).map((row: { id: string; name?: string }) => ({
+    id: row.id,
+    name: row.name ?? row.id,
+  }));
+}
+
+export type CampaignInput = {
+  name: string;
+  objective: string;
+  /** Minor units, as Meta expects: 2000 is £20.00. */
+  dailyBudgetMinor: number | null;
+};
+
+/**
+ * Creates a campaign, always paused.
+ *
+ * A daily budget here rather than on the ad set is what makes it a CBO
+ * campaign — Meta then distributes across ad sets itself. Passing null leaves
+ * the budget to the ad set instead, which is the non-CBO shape.
+ */
+export async function createCampaign(
+  adAccountId: string,
+  accessToken: string,
+  input: CampaignInput,
+  validateOnly = false,
+): Promise<{ id: string }> {
+  return graphPost<{ id: string }>(
+    `${adAccountId}/campaigns`,
+    {
+      name: input.name,
+      objective: input.objective,
+      status: "PAUSED",
+      special_ad_categories: "[]",
+      // Meta rejects the call outright without this when no campaign budget is
+      // set, and its own error only says "Invalid parameter" until you ask for
+      // the user-facing message.
+      is_adset_budget_sharing_enabled: "false",
+      ...(input.dailyBudgetMinor !== null
+        ? { daily_budget: String(input.dailyBudgetMinor) }
+        : {}),
+    },
+    accessToken,
+    validateOnly,
+  );
+}
+
+export type AdSetInput = {
+  name: string;
+  campaignId: string;
+  /** Omitted when the campaign holds the budget (CBO). */
+  dailyBudgetMinor: number | null;
+  countries: string[];
+  ageMin: number;
+  ageMax: number;
+  /** ISO 8601. Meta refuses a start in the past. */
+  startTime: string | null;
+  endTime: string | null;
+  pixelId: string | null;
+  customEventType: string;
+  optimizationGoal: string;
+  billingEvent: string;
+};
+
+/**
+ * Creates an ad set, always paused.
+ *
+ * This is where the pixel lives: `promoted_object` binds the ad set to a pixel
+ * and the conversion event it optimises for. Without it Meta refuses any
+ * conversion-optimised ad set, and with the wrong event it will happily
+ * optimise for the wrong thing — which is why the caller names both rather
+ * than getting a default.
+ */
+export async function createAdSet(
+  adAccountId: string,
+  accessToken: string,
+  input: AdSetInput,
+  validateOnly = false,
+): Promise<{ id: string }> {
+  const targeting: Record<string, unknown> = {
+    geo_locations: { countries: input.countries },
+    age_min: input.ageMin,
+    age_max: input.ageMax,
+  };
+
+  return graphPost<{ id: string }>(
+    `${adAccountId}/adsets`,
+    {
+      name: input.name,
+      campaign_id: input.campaignId,
+      status: "PAUSED",
+      optimization_goal: input.optimizationGoal,
+      billing_event: input.billingEvent,
+      targeting: JSON.stringify(targeting),
+      ...(input.dailyBudgetMinor !== null
+        ? { daily_budget: String(input.dailyBudgetMinor) }
+        : {}),
+      ...(input.startTime ? { start_time: input.startTime } : {}),
+      ...(input.endTime ? { end_time: input.endTime } : {}),
+      ...(input.pixelId
+        ? {
+            promoted_object: JSON.stringify({
+              pixel_id: input.pixelId,
+              custom_event_type: input.customEventType,
+            }),
+          }
+        : {}),
+    },
+    accessToken,
+    validateOnly,
+  );
+}
+
 export type CreativeInput = {
   name: string;
   pageId: string;
