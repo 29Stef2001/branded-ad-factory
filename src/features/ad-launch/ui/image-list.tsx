@@ -1,0 +1,138 @@
+"use client";
+
+import { useState } from "react";
+import { ArrowDown, ArrowUp, Images, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+
+/**
+ * The images in a batch, in order. One ad each.
+ *
+ * Every ad in an ad set carries the same copy — only the picture changes — so
+ * the batch is a list of images against one block of text, not a list of ads
+ * each repeating the same words. Building it the other way meant retyping the
+ * same headline thirty times, or forgetting to on the thirty-first.
+ *
+ * Order is kept and adjustable because it decides the ad numbering, and people
+ * paste creatives in the sequence they think about them.
+ */
+export function ImageList({
+  images,
+  onChange,
+}: {
+  images: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [pasted, setPasted] = useState("");
+
+  const parsed = pasted
+    .split(/[\n,\s]+/)
+    .map((line) => line.trim())
+    .filter((line) => /^https?:\/\//i.test(line));
+
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= images.length) return;
+    const next = [...images];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
+        <span className="text-sm font-medium">Paste image URLs</span>
+        <p className="text-xs text-muted-foreground">
+          One per line. Each becomes its own ad, in this order, sharing the copy
+          above.
+        </p>
+        <Textarea
+          rows={4}
+          value={pasted}
+          onChange={(event) => setPasted(event.target.value)}
+          placeholder={"https://…/creative-01.png\nhttps://…/creative-02.png"}
+          className="font-mono text-[13px]"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={parsed.length === 0}
+            onClick={() => {
+              // Duplicates are dropped rather than accepted: the same creative
+              // twice in one ad set competes with itself for delivery.
+              onChange([...new Set([...images, ...parsed])]);
+              setPasted("");
+            }}
+          >
+            <Images aria-hidden className="size-3.5" />
+            Add {parsed.length || ""} image{parsed.length === 1 ? "" : "s"}
+          </Button>
+          {pasted.trim() && parsed.length === 0 && (
+            <span className="text-xs text-destructive">
+              No usable URLs — each line must start with http:// or https://
+            </span>
+          )}
+        </div>
+      </div>
+
+      {images.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {images.map((url, index) => (
+            <div
+              key={url}
+              className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-sm"
+            >
+              <span className="w-6 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
+                {index + 1}
+              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL */}
+              <img
+                src={url}
+                alt=""
+                className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
+              />
+              <span className="min-w-40 flex-1 truncate font-mono text-xs text-muted-foreground">
+                {url}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={index === 0}
+                  onClick={() => move(index, index - 1)}
+                  aria-label="Move up"
+                >
+                  <ArrowUp aria-hidden className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={index === images.length - 1}
+                  onClick={() => move(index, index + 1)}
+                  aria-label="Move down"
+                >
+                  <ArrowDown aria-hidden className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    onChange(images.filter((_, position) => position !== index))
+                  }
+                  aria-label="Remove"
+                >
+                  <Trash2 aria-hidden className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

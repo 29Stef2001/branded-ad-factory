@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Rocket, ShieldCheck } from "lucide-react";
+import { Rocket, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
-import { AdFields, type AdDraft } from "@/features/ad-launch/ui/ad-fields";
-import { BulkImages } from "@/features/ad-launch/ui/bulk-images";
+import { ImageList } from "@/features/ad-launch/ui/image-list";
+import { CALL_TO_ACTIONS } from "@/features/ad-launch/domain/campaign-settings";
+import { Textarea } from "@/components/ui/textarea";
 import {
   CONVERSION_EVENTS,
   OBJECTIVE_LABELS,
@@ -26,6 +27,21 @@ import {
 
 type Option = { id: string; label: string };
 
+/** Meta truncates past these in the feed rather than rejecting the ad. */
+function CharacterCount({ value, limit }: { value: string; limit: number }) {
+  const over = value.length > limit;
+  return (
+    <span
+      className={
+        over ? "text-xs text-warning" : "text-xs text-muted-foreground/70"
+      }
+    >
+      {value.length}/{limit}
+      {over ? " — will be truncated" : ""}
+    </span>
+  );
+}
+
 /** Explains a blocker once, rather than repeating it on every failed ad. */
 const BLOCKER_TEXT: Record<string, string> = {
   development_mode:
@@ -35,19 +51,6 @@ const BLOCKER_TEXT: Record<string, string> = {
   business_blocked:
     "The Business behind this ad account is not permitted to advertise. That is a Meta policy decision about the business, not about this account or these settings.",
 };
-
-function newAd(): AdDraft {
-  return {
-    id: crypto.randomUUID(),
-    primaryText: "",
-    headline: "",
-    description: "",
-    callToAction: "SHOP_NOW",
-    linkUrl: "",
-    imageUrl: "",
-    conceptId: null,
-  };
-}
 
 export function LaunchBuilder({
   accounts,
@@ -82,7 +85,14 @@ export function LaunchBuilder({
   // Off by default. Threads is a placement most of these campaigns do not
   // want, and it is included automatically unless the platforms are named.
   const [includeThreads, setIncludeThreads] = useState(false);
-  const [ads, setAds] = useState<AdDraft[]>([newAd()]);
+  // Every ad in an ad set carries the same words; only the picture changes.
+  // So the copy is one block and the batch is a list of images.
+  const [primaryText, setPrimaryText] = useState("");
+  const [headline, setHeadline] = useState("");
+  const [description, setDescription] = useState("");
+  const [callToAction, setCallToAction] = useState("SHOP_NOW");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [images, setImages] = useState<string[]>([]);
 
   // Existing structure. These accounts push creatives into an ad set someone
   // has already tuned, so that is the default way of working rather than an
@@ -185,11 +195,6 @@ export function LaunchBuilder({
     });
   };
 
-  const updateAd = (id: string, patch: Partial<AdDraft>) =>
-    setAds((current) =>
-      current.map((ad) => (ad.id === id ? { ...ad, ...patch } : ad)),
-    );
-
   const run = (dryRun: boolean) => {
     setResult(null);
     startTransition(async () => {
@@ -211,13 +216,14 @@ export function LaunchBuilder({
         existingCampaignHasBudget:
           campaigns.find((campaign) => campaign.id === campaignId)?.hasBudget ??
           false,
-        ads: ads.map((ad) => ({
-          primaryText: ad.primaryText,
-          headline: ad.headline,
-          description: ad.description,
-          callToAction: ad.callToAction,
-          linkUrl: ad.linkUrl,
-          imageUrl: ad.imageUrl,
+        // One ad per image, all sharing the copy above.
+        ads: images.map((imageUrl) => ({
+          primaryText,
+          headline,
+          description,
+          callToAction,
+          linkUrl,
+          imageUrl,
         })),
         adStatus,
         dryRun,
@@ -525,53 +531,84 @@ export function LaunchBuilder({
       </DarkPanel>
 
       <DarkPanel
-        title={`3 · Ads (${ads.length})`}
-        description="Each one becomes its own ad in the new ad set."
-        actions={
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setAds((current) => [...current, newAd()])}
-          >
-            <Plus aria-hidden className="size-3.5" />
-            Add ad
-          </Button>
-        }
+        title="3 · Ad copy"
+        description="Shared by every ad in this batch. Only the image differs, which is how these ad sets are actually built."
         contentClassName="flex flex-col gap-3"
       >
-        <BulkImages
-          onAdd={(urls) =>
-            setAds((current) => {
-              const added = urls.map((imageUrl) => ({ ...newAd(), imageUrl }));
-              // An untouched first row is a placeholder, not content — keeping
-              // it would leave an empty ad in the middle of the batch.
-              const isBlank =
-                current.length === 1 &&
-                !current[0].imageUrl &&
-                !current[0].headline &&
-                !current[0].primaryText;
-              return isBlank ? added : [...current, ...added];
-            })
-          }
-        />
-
-        {ads.map((ad, index) => (
-          <AdFields
-            key={ad.id}
-            ad={ad}
-            index={index}
-            onChange={updateAd}
-            onRemove={(id) =>
-              setAds((current) => current.filter((item) => item.id !== id))
-            }
-            canRemove={ads.length > 1}
+        <label className="flex flex-col gap-1">
+          <span className="flex items-baseline justify-between gap-2 text-xs font-medium">
+            Primary text
+            <CharacterCount value={primaryText} limit={125} />
+          </span>
+          <Textarea
+            rows={3}
+            value={primaryText}
+            onChange={(event) => setPrimaryText(event.target.value)}
+            placeholder="The body copy above the image."
           />
-        ))}
+        </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="flex items-baseline justify-between gap-2 text-xs font-medium">
+              Headline
+              <CharacterCount value={headline} limit={40} />
+            </span>
+            <Input
+              value={headline}
+              onChange={(event) => setHeadline(event.target.value)}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="flex items-baseline justify-between gap-2 text-xs font-medium">
+              Description
+              <CharacterCount value={description} limit={30} />
+            </span>
+            <Input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium">Call to action</span>
+            <select
+              value={callToAction}
+              onChange={(event) => setCallToAction(event.target.value)}
+              className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
+            >
+              {CALL_TO_ACTIONS.map((cta) => (
+                <option key={cta} value={cta}>
+                  {cta.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium">Destination URL</span>
+            <Input
+              type="url"
+              value={linkUrl}
+              onChange={(event) => setLinkUrl(event.target.value)}
+              placeholder="https://…"
+            />
+          </label>
+        </div>
       </DarkPanel>
 
       <DarkPanel
-        title="4 · Launch"
+        title={`4 · Images (${images.length})`}
+        description="One ad per image, in this order."
+        contentClassName="flex flex-col gap-3"
+      >
+        <ImageList images={images} onChange={setImages} />
+      </DarkPanel>
+
+      <DarkPanel
+        title="5 · Launch"
         description="A dry run asks Meta to validate everything and create nothing. Worth doing first — it is the only way to find out whether Meta accepts these settings without finding out the expensive way."
         contentClassName="flex flex-col gap-3"
       >
@@ -628,7 +665,7 @@ export function LaunchBuilder({
             <Rocket aria-hidden className="size-3.5" />
             {pending
               ? "Launching…"
-              : `Launch ${ads.length} ad${ads.length === 1 ? "" : "s"}`}
+              : `Launch ${images.length} ad${images.length === 1 ? "" : "s"}`}
           </Button>
         </div>
 
