@@ -22,6 +22,10 @@ import {
   type LaunchStatus,
 } from "@/features/ad-launch/infrastructure/meta-launch-client";
 import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
+import {
+  getSignedImageUrls,
+  listConcepts,
+} from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 import { recordBatch } from "@/features/ad-launch/infrastructure/launch-repository";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 
@@ -540,5 +544,69 @@ export async function describeAdSetAction(adSetId: string): Promise<{
     };
   } catch (error) {
     return { details: null, error: describe(error) };
+  }
+}
+
+/**
+ * Approved creatives ready to be launched.
+ *
+ * The bridge between generating and launching. Without it the two halves of
+ * this app are joined by copy-paste: the headline and body already exist, the
+ * image is already in Storage, and retyping them is both work and a way to
+ * launch wording that no longer matches what QA approved.
+ *
+ * Only concepts with an image are offered, since an ad without one cannot be
+ * created — and the signed URL is what Meta will be told to fetch.
+ */
+export async function listLaunchableConceptsAction(): Promise<{
+  concepts: {
+    id: string;
+    headline: string;
+    bodyCopy: string;
+    conceptCode: string | null;
+    imageUrl: string;
+    qaPassed: boolean;
+  }[];
+  error: string | null;
+}> {
+  const { denied } = await requireUserId();
+  if (denied)
+    return { concepts: [], error: denied.message ?? "Not signed in." };
+
+  try {
+    const concepts = await listConcepts();
+    const withImages = concepts.filter(
+      (concept) => concept.creative_image_path,
+    );
+
+    const signed = await getSignedImageUrls(
+      withImages
+        .map((concept) => concept.creative_image_path)
+        .filter((path): path is string => path !== null),
+    );
+
+    return {
+      concepts: withImages
+        .map((concept) => {
+          const imageUrl = signed.get(concept.creative_image_path ?? "");
+          if (!imageUrl) return null;
+          return {
+            id: concept.id,
+            headline: concept.headline,
+            bodyCopy: concept.body_copy,
+            conceptCode: concept.concept_code,
+            imageUrl,
+            // Shown rather than filtered on: a creative that failed QA is
+            // still the user's to launch, but they should know which it is.
+            qaPassed: concept.generation_status === "approved",
+          };
+        })
+        .filter(
+          (concept): concept is NonNullable<typeof concept> => concept !== null,
+        ),
+      error: null,
+    };
+  } catch (error) {
+    return { concepts: [], error: describe(error) };
   }
 }

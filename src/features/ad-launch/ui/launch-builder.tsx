@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
 import { ImageList, type ImageEntry } from "@/features/ad-launch/ui/image-list";
+import { ConceptPicker } from "@/features/ad-launch/ui/concept-picker";
 import { CALL_TO_ACTIONS } from "@/features/ad-launch/domain/campaign-settings";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -604,6 +605,28 @@ export function LaunchBuilder({
         description="One ad per image, in this order."
         contentClassName="flex flex-col gap-3"
       >
+        <ConceptPicker
+          onAdd={(entries, code) => {
+            // Duplicates are dropped: the same creative twice in one ad set
+            // competes with itself for delivery.
+            setImages((current) => {
+              const known = new Set(current.map((image) => image.url));
+              return [
+                ...current,
+                ...entries.filter((entry) => !known.has(entry.url)),
+              ];
+            });
+            // The concept code in the campaign name is what links this ad's
+            // performance back to the concept without anyone remembering to
+            // type it.
+            if (code && !campaignName.includes(code)) {
+              setCampaignName((current) =>
+                current ? `${current} — ${code}` : code,
+              );
+            }
+          }}
+        />
+
         <ImageList images={images} onChange={setImages} />
       </DarkPanel>
 
