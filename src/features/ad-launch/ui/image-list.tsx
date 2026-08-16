@@ -1,9 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Images, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Images, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+
+export type ImageEntry = {
+  url: string;
+  /**
+   * Copy for this one ad, when it should differ from the shared block.
+   *
+   * Null is the normal case — the whole point of the shared block is that
+   * these are almost always identical. An override exists because "almost" is
+   * not "always": one creative in a batch sometimes needs its own headline,
+   * and the alternative is launching it separately.
+   */
+  overrideHeadline: string | null;
+  overridePrimaryText: string | null;
+};
 
 /**
  * The images in a batch, in order. One ad each.
@@ -20,10 +35,11 @@ export function ImageList({
   images,
   onChange,
 }: {
-  images: string[];
-  onChange: (next: string[]) => void;
+  images: ImageEntry[];
+  onChange: (next: ImageEntry[]) => void;
 }) {
   const [pasted, setPasted] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
 
   const parsed = pasted
     .split(/[\n,\s]+/)
@@ -62,7 +78,17 @@ export function ImageList({
             onClick={() => {
               // Duplicates are dropped rather than accepted: the same creative
               // twice in one ad set competes with itself for delivery.
-              onChange([...new Set([...images, ...parsed])]);
+              const known = new Set(images.map((image) => image.url));
+              onChange([
+                ...images,
+                ...parsed
+                  .filter((url) => !known.has(url))
+                  .map((url) => ({
+                    url,
+                    overrideHeadline: null,
+                    overridePrimaryText: null,
+                  })),
+              ]);
               setPasted("");
             }}
           >
@@ -79,56 +105,118 @@ export function ImageList({
 
       {images.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          {images.map((url, index) => (
+          {images.map((image, index) => (
             <div
-              key={url}
-              className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-sm"
+              key={image.url}
+              className="flex flex-col gap-2 rounded-md border border-border p-2 text-sm"
             >
-              <span className="w-6 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
-                {index + 1}
-              </span>
-              {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL */}
-              <img
-                src={url}
-                alt=""
-                className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
-              />
-              <span className="min-w-40 flex-1 truncate font-mono text-xs text-muted-foreground">
-                {url}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={index === 0}
-                  onClick={() => move(index, index - 1)}
-                  aria-label="Move up"
-                >
-                  <ArrowUp aria-hidden className="size-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={index === images.length - 1}
-                  onClick={() => move(index, index + 1)}
-                  aria-label="Move down"
-                >
-                  <ArrowDown aria-hidden className="size-3.5" />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    onChange(images.filter((_, position) => position !== index))
-                  }
-                  aria-label="Remove"
-                >
-                  <Trash2 aria-hidden className="size-3.5" />
-                </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-6 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
+                  {index + 1}
+                </span>
+                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL */}
+                <img
+                  src={image.url}
+                  alt=""
+                  className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
+                />
+                <span className="min-w-40 flex-1 truncate font-mono text-xs text-muted-foreground">
+                  {image.url}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={index === 0}
+                    onClick={() => move(index, index - 1)}
+                    aria-label="Move up"
+                  >
+                    <ArrowUp aria-hidden className="size-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={index === images.length - 1}
+                    onClick={() => move(index, index + 1)}
+                    aria-label="Move down"
+                  >
+                    <ArrowDown aria-hidden className="size-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      image.overrideHeadline || image.overridePrimaryText
+                        ? "default"
+                        : "ghost"
+                    }
+                    onClick={() =>
+                      setEditing(editing === image.url ? null : image.url)
+                    }
+                    aria-label="Different copy for this ad"
+                    title="Different copy for this ad"
+                  >
+                    <Pencil aria-hidden className="size-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      onChange(
+                        images.filter((_, position) => position !== index),
+                      )
+                    }
+                    aria-label="Remove"
+                  >
+                    <Trash2 aria-hidden className="size-3.5" />
+                  </Button>
+                </div>
               </div>
+
+              {editing === image.url && (
+                <div className="flex flex-col gap-2 border-t border-border pt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank to use the shared copy. Only fill these in when
+                    this one ad needs different words.
+                  </p>
+                  <Input
+                    value={image.overrideHeadline ?? ""}
+                    onChange={(event) =>
+                      onChange(
+                        images.map((entry, position) =>
+                          position === index
+                            ? {
+                                ...entry,
+                                overrideHeadline: event.target.value || null,
+                              }
+                            : entry,
+                        ),
+                      )
+                    }
+                    placeholder="Headline for this ad only"
+                  />
+                  <Textarea
+                    rows={2}
+                    value={image.overridePrimaryText ?? ""}
+                    onChange={(event) =>
+                      onChange(
+                        images.map((entry, position) =>
+                          position === index
+                            ? {
+                                ...entry,
+                                overridePrimaryText: event.target.value || null,
+                              }
+                            : entry,
+                        ),
+                      )
+                    }
+                    placeholder="Primary text for this ad only"
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>

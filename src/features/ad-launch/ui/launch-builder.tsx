@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
-import { ImageList } from "@/features/ad-launch/ui/image-list";
+import { ImageList, type ImageEntry } from "@/features/ad-launch/ui/image-list";
 import { CALL_TO_ACTIONS } from "@/features/ad-launch/domain/campaign-settings";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -92,7 +92,7 @@ export function LaunchBuilder({
   const [description, setDescription] = useState("");
   const [callToAction, setCallToAction] = useState("SHOP_NOW");
   const [linkUrl, setLinkUrl] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageEntry[]>([]);
 
   // Existing structure. These accounts push creatives into an ad set someone
   // has already tuned, so that is the default way of working rather than an
@@ -216,14 +216,14 @@ export function LaunchBuilder({
         existingCampaignHasBudget:
           campaigns.find((campaign) => campaign.id === campaignId)?.hasBudget ??
           false,
-        // One ad per image, all sharing the copy above.
-        ads: images.map((imageUrl) => ({
-          primaryText,
-          headline,
+        // One ad per image, sharing the copy above unless that ad overrides it.
+        ads: images.map((image) => ({
+          primaryText: image.overridePrimaryText ?? primaryText,
+          headline: image.overrideHeadline ?? headline,
           description,
           callToAction,
           linkUrl,
-          imageUrl,
+          imageUrl: image.url,
         })),
         adStatus,
         dryRun,
