@@ -2233,6 +2233,165 @@ export type Database = {
         }
         Relationships: []
       }
+      launch_batches: {
+        Row: {
+          ad_account_id: string
+          ad_status: string
+          adset_meta_id: string | null
+          adset_name: string | null
+          age_max: number | null
+          age_min: number | null
+          campaign_meta_id: string | null
+          campaign_name: string | null
+          countries: string[]
+          created_at: string
+          custom_event_type: string | null
+          daily_budget_minor: number | null
+          dry_run: boolean
+          error: string | null
+          finished_at: string | null
+          id: string
+          objective: string | null
+          page_id: string | null
+          pixel_id: string | null
+          start_time: string | null
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          ad_status?: string
+          adset_meta_id?: string | null
+          adset_name?: string | null
+          age_max?: number | null
+          age_min?: number | null
+          campaign_meta_id?: string | null
+          campaign_name?: string | null
+          countries?: string[]
+          created_at?: string
+          custom_event_type?: string | null
+          daily_budget_minor?: number | null
+          dry_run?: boolean
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          objective?: string | null
+          page_id?: string | null
+          pixel_id?: string | null
+          start_time?: string | null
+          started_at?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          ad_status?: string
+          adset_meta_id?: string | null
+          adset_name?: string | null
+          age_max?: number | null
+          age_min?: number | null
+          campaign_meta_id?: string | null
+          campaign_name?: string | null
+          countries?: string[]
+          created_at?: string
+          custom_event_type?: string | null
+          daily_budget_minor?: number | null
+          dry_run?: boolean
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          objective?: string | null
+          page_id?: string | null
+          pixel_id?: string | null
+          start_time?: string | null
+          started_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      launch_items: {
+        Row: {
+          ad_meta_id: string | null
+          ad_name: string
+          batch_id: string
+          call_to_action: string
+          concept_id: string | null
+          created_at: string
+          creative_meta_id: string | null
+          description: string | null
+          error: string | null
+          error_subcode: number | null
+          headline: string
+          id: string
+          image_hash: string | null
+          image_url: string
+          link_url: string
+          position: number
+          primary_text: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_meta_id?: string | null
+          ad_name: string
+          batch_id: string
+          call_to_action?: string
+          concept_id?: string | null
+          created_at?: string
+          creative_meta_id?: string | null
+          description?: string | null
+          error?: string | null
+          error_subcode?: number | null
+          headline: string
+          id?: string
+          image_hash?: string | null
+          image_url: string
+          link_url: string
+          position: number
+          primary_text: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ad_meta_id?: string | null
+          ad_name?: string
+          batch_id?: string
+          call_to_action?: string
+          concept_id?: string | null
+          created_at?: string
+          creative_meta_id?: string | null
+          description?: string | null
+          error?: string | null
+          error_subcode?: number | null
+          headline?: string
+          id?: string
+          image_hash?: string | null
+          image_url?: string
+          link_url?: string
+          position?: number
+          primary_text?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "launch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "launch_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "launch_items_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "ad_concepts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_ad_account_connections: {
         Row: {
           access_token: string

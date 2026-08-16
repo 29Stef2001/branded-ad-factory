@@ -18,6 +18,7 @@ import {
   type LaunchStatus,
 } from "@/features/ad-launch/infrastructure/meta-launch-client";
 import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
+import { recordBatch } from "@/features/ad-launch/infrastructure/launch-repository";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 
 /**
@@ -99,7 +100,7 @@ async function fetchImageBytes(
 export async function launchBatchAction(
   draft: BatchDraft & { adStatus: LaunchStatus; dryRun: boolean },
 ): Promise<LaunchResult> {
-  const { denied } = await requireUserId();
+  const { userId, denied } = await requireUserId();
   if (denied) {
     return {
       ...empty,
@@ -265,6 +266,50 @@ export async function launchBatchAction(
       : null;
 
   const verb = dryRun ? "would be created" : "created";
+  const status =
+    failed === 0 ? "success" : succeeded === 0 ? "failed" : "partial";
+
+  try {
+    await recordBatch(
+      userId,
+      {
+        adAccountId: account,
+        pageId: draft.pageId,
+        campaignName: draft.campaignName,
+        objective: draft.objective,
+        dailyBudgetMinor: toMinorUnits(draft.dailyBudget),
+        countries: parseCountries(draft.countries),
+        ageMin: draft.ageMin,
+        ageMax: draft.ageMax,
+        startTime: draft.startTime,
+        pixelId: draft.pixelId,
+        customEventType: draft.customEventType,
+        adStatus: draft.adStatus,
+        dryRun,
+        campaignMetaId: campaignId,
+        adSetMetaId: adSetId,
+        status: status === "success" ? "completed" : status,
+        error: null,
+      },
+      results.map((result) => {
+        const ad = draft.ads[result.position];
+        return {
+          ...result,
+          primaryText: ad.primaryText,
+          linkUrl: ad.linkUrl,
+          imageUrl: ad.imageUrl,
+          callToAction: ad.callToAction,
+          description: ad.description || null,
+          conceptId: null,
+        };
+      }),
+    );
+  } catch (error) {
+    // The ads exist in Meta whether or not the record was written, so a failed
+    // write must not turn a successful launch into a reported failure. It is
+    // logged and the real outcome is returned.
+    console.error("Could not record the launch batch", error);
+  }
 
   return {
     problems: [],
@@ -272,7 +317,7 @@ export async function launchBatchAction(
     adSetId,
     ads: results,
     blocker: sharedBlocker,
-    status: failed === 0 ? "success" : succeeded === 0 ? "failed" : "partial",
+    status,
     message:
       failed === 0
         ? `${succeeded} ad${succeeded === 1 ? "" : "s"} ${verb}${dryRun ? " — nothing was actually created" : ` as ${draft.adStatus}`}.`

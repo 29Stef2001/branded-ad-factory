@@ -67,6 +67,10 @@ export const NAV_TREE: NavEntry[] = [
         label: "Launch in Meta",
         segment: "ad-factory/launch",
       },
+      {
+        label: "Launch ads",
+        segment: "ad-factory/launch/builder",
+      },
     ],
   },
   {
