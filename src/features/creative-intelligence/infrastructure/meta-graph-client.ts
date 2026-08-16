@@ -249,3 +249,104 @@ export async function fetchDailyInsights(
     nextCursor: page.nextCursor,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Account and Page discovery
+// ---------------------------------------------------------------------------
+
+export type MetaAdAccountSummary = {
+  adAccountId: string;
+  name: string | null;
+  currency: string | null;
+  accountStatus: number | null;
+  businessName: string | null;
+};
+
+/**
+ * Every ad account this token can reach.
+ *
+ * `business` is requested separately from the rest because it needs
+ * `business_management`, which a read-only connection does not have. Asking for
+ * it in the main field list makes Graph reject the *whole* call with
+ * "(#100) Requires business_management permission" — so the account list, which
+ * `ads_read` alone can serve perfectly well, would come back empty.
+ */
+export async function fetchAdAccounts(
+  accessToken: string,
+  after?: string,
+): Promise<Page<MetaAdAccountSummary>> {
+  type RawAccount = {
+    id: string;
+    name?: string;
+    currency?: string;
+    account_status?: number;
+    business?: { name?: string };
+  };
+
+  const request = (fields: string) =>
+    graphGet<Paged<RawAccount>>(
+      "me/adaccounts",
+      { fields, limit: String(PAGE_SIZE), ...(after ? { after } : {}) },
+      accessToken,
+    );
+
+  let body: Paged<RawAccount>;
+  try {
+    body = await request("id,name,currency,account_status,business{name}");
+  } catch {
+    // Fall back to what every connection can read.
+    body = await request("id,name,currency,account_status");
+  }
+
+  return pageOf(body, (account) => ({
+    adAccountId: account.id,
+    name: account.name ?? null,
+    currency: account.currency ?? null,
+    accountStatus: account.account_status ?? null,
+    businessName: account.business?.name ?? null,
+  }));
+}
+
+export type MetaPageSummary = {
+  pageId: string;
+  name: string | null;
+  pageAccessToken: string | null;
+  instagramActorId: string | null;
+};
+
+/**
+ * Facebook Pages this token can act for.
+ *
+ * Every ad creative must name a Page, so an empty result here is a hard block
+ * on launching — not a cosmetic gap. It comes back empty both when the person
+ * genuinely has no Page and when `pages_show_list` has not been granted, and
+ * the caller cannot tell those apart from the payload alone.
+ */
+export async function fetchPages(
+  accessToken: string,
+  after?: string,
+): Promise<Page<MetaPageSummary>> {
+  type RawPage = {
+    id: string;
+    name?: string;
+    access_token?: string;
+    instagram_business_account?: { id?: string };
+  };
+
+  const body = await graphGet<Paged<RawPage>>(
+    "me/accounts",
+    {
+      fields: "id,name,access_token,instagram_business_account{id}",
+      limit: String(PAGE_SIZE),
+      ...(after ? { after } : {}),
+    },
+    accessToken,
+  );
+
+  return pageOf(body, (page) => ({
+    pageId: page.id,
+    name: page.name ?? null,
+    pageAccessToken: page.access_token ?? null,
+    instagramActorId: page.instagram_business_account?.id ?? null,
+  }));
+}
