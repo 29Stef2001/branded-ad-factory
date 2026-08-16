@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
 import { AdFields, type AdDraft } from "@/features/ad-launch/ui/ad-fields";
+import { BulkImages } from "@/features/ad-launch/ui/bulk-images";
 import {
   CONVERSION_EVENTS,
   OBJECTIVE_LABELS,
@@ -15,7 +16,11 @@ import {
   type Objective,
 } from "@/features/ad-launch/domain/campaign-settings";
 import {
+  describeAdSetAction,
   launchBatchAction,
+  listAccountCampaignsAction,
+  listAccountPixelsAction,
+  listCampaignAdSetsAction,
   type LaunchResult,
 } from "@/features/ad-launch/application/launch-batch";
 
@@ -58,6 +63,11 @@ export function LaunchBuilder({
   defaultPageId: string | null;
 }) {
   const [adAccountId, setAdAccountId] = useState(defaultAccountId ?? "");
+  // Pixels belong to an account, so the list is state rather than a prop: it
+  // is reloaded whenever the account changes.
+  const [availablePixels, setAvailablePixels] = useState<Option[]>(pixels);
+  const [pixelError, setPixelError] = useState<string | null>(null);
+  const [loadingPixels, setLoadingPixels] = useState(false);
   const [pageId, setPageId] = useState(defaultPageId ?? "");
   const [campaignName, setCampaignName] = useState("");
   const [objective, setObjective] = useState<Objective>("OUTCOME_SALES");
@@ -71,8 +81,102 @@ export function LaunchBuilder({
   const [adStatus, setAdStatus] = useState<"PAUSED" | "ACTIVE">("PAUSED");
   const [ads, setAds] = useState<AdDraft[]>([newAd()]);
 
+  // Existing structure. These accounts push creatives into an ad set someone
+  // has already tuned, so that is the default way of working rather than an
+  // alternative buried behind a toggle.
+  const [mode, setMode] = useState<"existing" | "new">("existing");
+  const [campaigns, setCampaigns] = useState<Option[]>([]);
+  const [campaignId, setCampaignId] = useState("");
+  const [adSets, setAdSets] = useState<Option[]>([]);
+  const [existingAdSetId, setExistingAdSetId] = useState("");
+  const [adSetSummary, setAdSetSummary] = useState<string | null>(null);
+
   const [result, setResult] = useState<LaunchResult | null>(null);
   const [pending, startTransition] = useTransition();
+
+  /**
+   * Switches account and reloads its pixels.
+   *
+   * Done in the change handler rather than an effect: the reload is caused by
+   * the choice, and the selected pixel is cleared first so a pixel from the
+   * previous account can never be submitted while the new list is in flight.
+   */
+  const changeAccount = (nextAccountId: string) => {
+    setAdAccountId(nextAccountId);
+    setPixelId("");
+    setPixelError(null);
+    setAvailablePixels([]);
+    if (!nextAccountId) return;
+
+    // The campaign list belongs to the account too.
+    setCampaigns([]);
+    setCampaignId("");
+    setAdSets([]);
+    setExistingAdSetId("");
+    setAdSetSummary(null);
+
+    setLoadingPixels(true);
+    startTransition(async () => {
+      const [found, campaignList] = await Promise.all([
+        listAccountPixelsAction(nextAccountId),
+        listAccountCampaignsAction(nextAccountId),
+      ]);
+      setAvailablePixels(found.pixels);
+      setPixelError(found.error);
+      // Only auto-select when there is no ambiguity.
+      if (found.pixels.length === 1) setPixelId(found.pixels[0].id);
+      setCampaigns(campaignList.campaigns);
+      setLoadingPixels(false);
+    });
+  };
+
+  const changeCampaign = (nextCampaignId: string) => {
+    setCampaignId(nextCampaignId);
+    setAdSets([]);
+    setExistingAdSetId("");
+    setAdSetSummary(null);
+    if (!nextCampaignId) return;
+
+    startTransition(async () => {
+      const found = await listCampaignAdSetsAction(nextCampaignId);
+      setAdSets(found.adSets);
+    });
+  };
+
+  /**
+   * Shows what the chosen ad set already decides.
+   *
+   * Picking the wrong ad set is otherwise invisible until the money has moved:
+   * its pixel, schedule and targeting silently become this batch's.
+   */
+  const changeAdSet = (nextAdSetId: string) => {
+    setExistingAdSetId(nextAdSetId);
+    setAdSetSummary(null);
+    if (!nextAdSetId) return;
+
+    startTransition(async () => {
+      const { details } = await describeAdSetAction(nextAdSetId);
+      if (!details) return;
+      setAdSetSummary(
+        [
+          details.startTime
+            ? `starts ${new Date(details.startTime).toLocaleString("en-GB")}`
+            : "starts when switched on",
+          details.pixelId
+            ? `pixel ${details.pixelId} · ${details.customEventType}`
+            : "no pixel",
+          details.countries.length
+            ? details.countries.join(", ")
+            : "no country set",
+          details.ageMin && details.ageMax
+            ? `age ${details.ageMin}–${details.ageMax}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+    });
+  };
 
   const updateAd = (id: string, patch: Partial<AdDraft>) =>
     setAds((current) =>
@@ -94,6 +198,7 @@ export function LaunchBuilder({
         startTime: startTime ? new Date(startTime).toISOString() : null,
         pixelId: requiresPixel(objective) ? pixelId || null : null,
         customEventType,
+        existingAdSetId: mode === "existing" ? existingAdSetId : null,
         ads: ads.map((ad) => ({
           primaryText: ad.primaryText,
           headline: ad.headline,
@@ -120,7 +225,7 @@ export function LaunchBuilder({
           <span className="text-xs font-medium">Ad account</span>
           <select
             value={adAccountId}
-            onChange={(event) => setAdAccountId(event.target.value)}
+            onChange={(event) => changeAccount(event.target.value)}
             className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
           >
             <option value="">Pick an account…</option>
@@ -151,115 +256,218 @@ export function LaunchBuilder({
 
       <DarkPanel
         title="2 · Campaign and ad set"
-        description="Created together, always paused. The budget sits on the campaign, so Meta distributes it across ad sets itself."
-        contentClassName="grid gap-3 sm:grid-cols-2"
+        description={
+          mode === "existing"
+            ? "Add these ads to an ad set that already runs. Its targeting, budget, schedule and pixel stay exactly as they are."
+            : "Created together, always paused. The budget sits on the campaign, so Meta distributes it across ad sets itself."
+        }
+        contentClassName="flex flex-col gap-3"
       >
-        <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-xs font-medium">Campaign name</span>
-          <Input
-            value={campaignName}
-            onChange={(event) => setCampaignName(event.target.value)}
-            placeholder="Final stock — cuffs — GB"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Objective</span>
-          <select
-            value={objective}
-            onChange={(event) => setObjective(event.target.value as Objective)}
-            className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "existing" ? "default" : "outline"}
+            onClick={() => setMode("existing")}
           >
-            {Object.entries(OBJECTIVE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Daily budget</span>
-          <Input
-            value={dailyBudget}
-            onChange={(event) => setDailyBudget(event.target.value)}
-            placeholder="20"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Countries</span>
-          <Input
-            value={countries}
-            onChange={(event) => setCountries(event.target.value)}
-            placeholder="GB, US"
-          />
-        </label>
-
-        <div className="flex items-end gap-2">
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs font-medium">Age from</span>
-            <Input
-              type="number"
-              value={ageMin}
-              onChange={(event) => setAgeMin(Number(event.target.value))}
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs font-medium">to</span>
-            <Input
-              type="number"
-              value={ageMax}
-              onChange={(event) => setAgeMax(Number(event.target.value))}
-            />
-          </label>
+            Use an existing ad set
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={mode === "new" ? "default" : "outline"}
+            onClick={() => setMode("new")}
+          >
+            Create a new campaign
+          </Button>
         </div>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Start time</span>
-          <Input
-            type="datetime-local"
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
-          <span className="text-xs text-muted-foreground">
-            Leave empty to start as soon as it is switched on.
-          </span>
-        </label>
-
-        {requiresPixel(objective) && (
-          <>
+        {mode === "existing" ? (
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Pixel</span>
+              <span className="text-xs font-medium">Campaign</span>
               <select
-                value={pixelId}
-                onChange={(event) => setPixelId(event.target.value)}
+                value={campaignId}
+                onChange={(event) => changeCampaign(event.target.value)}
                 className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
               >
-                <option value="">Pick a pixel…</option>
-                {pixels.map((pixel) => (
-                  <option key={pixel.id} value={pixel.id}>
-                    {pixel.label}
+                <option value="">
+                  {campaigns.length === 0
+                    ? "No campaigns found on this account"
+                    : "Pick a campaign…"}
+                </option>
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.label}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Optimise for</span>
+              <span className="text-xs font-medium">Ad set</span>
               <select
-                value={customEventType}
-                onChange={(event) => setCustomEventType(event.target.value)}
+                value={existingAdSetId}
+                onChange={(event) => changeAdSet(event.target.value)}
+                disabled={!campaignId}
                 className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
               >
-                {CONVERSION_EVENTS.map((event) => (
-                  <option key={event} value={event}>
-                    {event.replace(/_/g, " ")}
+                <option value="">
+                  {!campaignId
+                    ? "Pick a campaign first"
+                    : adSets.length === 0
+                      ? "No ad sets in this campaign"
+                      : "Pick an ad set…"}
+                </option>
+                {adSets.map((adSet) => (
+                  <option key={adSet.id} value={adSet.id}>
+                    {adSet.label}
                   </option>
                 ))}
               </select>
             </label>
-          </>
+
+            {adSetSummary && (
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                {/* Stated rather than assumed: choosing this ad set is choosing
+                    all of it, and a wrong choice is invisible until the money
+                    has moved. */}
+                This ad set: {adSetSummary}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-xs font-medium">Campaign name</span>
+              <Input
+                value={campaignName}
+                onChange={(event) => setCampaignName(event.target.value)}
+                placeholder="Final stock — cuffs — GB"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Objective</span>
+              <select
+                value={objective}
+                onChange={(event) =>
+                  setObjective(event.target.value as Objective)
+                }
+                className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
+              >
+                {Object.entries(OBJECTIVE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Daily budget</span>
+              <Input
+                value={dailyBudget}
+                onChange={(event) => setDailyBudget(event.target.value)}
+                placeholder="20"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Countries</span>
+              <Input
+                value={countries}
+                onChange={(event) => setCountries(event.target.value)}
+                placeholder="GB, US"
+              />
+            </label>
+
+            <div className="flex items-end gap-2">
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-xs font-medium">Age from</span>
+                <Input
+                  type="number"
+                  value={ageMin}
+                  onChange={(event) => setAgeMin(Number(event.target.value))}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-xs font-medium">to</span>
+                <Input
+                  type="number"
+                  value={ageMax}
+                  onChange={(event) => setAgeMax(Number(event.target.value))}
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Start time</span>
+              <Input
+                type="datetime-local"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+              />
+              <span className="text-xs text-muted-foreground">
+                Leave empty to start as soon as it is switched on.
+              </span>
+            </label>
+
+            {requiresPixel(objective) && (
+              <>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium">Pixel</span>
+                  <select
+                    value={pixelId}
+                    onChange={(event) => setPixelId(event.target.value)}
+                    disabled={loadingPixels}
+                    className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
+                  >
+                    <option value="">
+                      {loadingPixels
+                        ? "Loading pixels…"
+                        : availablePixels.length === 0
+                          ? "No pixels on this account"
+                          : "Pick a pixel…"}
+                    </option>
+                    {availablePixels.map((pixel) => (
+                      <option key={pixel.id} value={pixel.id}>
+                        {pixel.label}
+                      </option>
+                    ))}
+                  </select>
+                  {pixelError && (
+                    <span className="text-xs text-destructive">
+                      {pixelError}
+                    </span>
+                  )}
+                  {!pixelError &&
+                    !loadingPixels &&
+                    availablePixels.length === 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        This account has no pixel, so it cannot run a
+                        conversion-optimised campaign.
+                      </span>
+                    )}
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium">Optimise for</span>
+                  <select
+                    value={customEventType}
+                    onChange={(event) => setCustomEventType(event.target.value)}
+                    className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
+                  >
+                    {CONVERSION_EVENTS.map((event) => (
+                      <option key={event} value={event}>
+                        {event.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
         )}
       </DarkPanel>
 
@@ -279,6 +487,22 @@ export function LaunchBuilder({
         }
         contentClassName="flex flex-col gap-3"
       >
+        <BulkImages
+          onAdd={(urls) =>
+            setAds((current) => {
+              const added = urls.map((imageUrl) => ({ ...newAd(), imageUrl }));
+              // An untouched first row is a placeholder, not content — keeping
+              // it would leave an empty ad in the middle of the batch.
+              const isBlank =
+                current.length === 1 &&
+                !current[0].imageUrl &&
+                !current[0].headline &&
+                !current[0].primaryText;
+              return isBlank ? added : [...current, ...added];
+            })
+          }
+        />
+
         {ads.map((ad, index) => (
           <AdFields
             key={ad.id}

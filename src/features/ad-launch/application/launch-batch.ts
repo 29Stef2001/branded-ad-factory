@@ -14,6 +14,10 @@ import {
   createAdCreative,
   createAdSet,
   createCampaign,
+  getAdSetDetails,
+  listAdSets,
+  listCampaigns,
+  listPixels,
   uploadAdImage,
   type LaunchStatus,
 } from "@/features/ad-launch/infrastructure/meta-launch-client";
@@ -98,7 +102,19 @@ async function fetchImageBytes(
 }
 
 export async function launchBatchAction(
-  draft: BatchDraft & { adStatus: LaunchStatus; dryRun: boolean },
+  draft: BatchDraft & {
+    adStatus: LaunchStatus;
+    dryRun: boolean;
+    /**
+     * Launch into an ad set that already exists.
+     *
+     * When set, no campaign or ad set is created: the targeting, budget,
+     * schedule and pixel are whatever that ad set already carries. This is how
+     * these accounts are actually used — creatives are added to an ad set
+     * someone has already tuned.
+     */
+    existingAdSetId?: string | null;
+  },
 ): Promise<LaunchResult> {
   const { userId, denied } = await requireUserId();
   if (denied) {
@@ -109,7 +125,19 @@ export async function launchBatchAction(
     };
   }
 
-  const problems = validateDraft(draft);
+  const usingExisting = Boolean(draft.existingAdSetId);
+  // Campaign and ad set fields describe something that will not be created
+  // when an existing ad set is chosen, so validating them would reject a
+  // perfectly good batch for fields nobody filled in.
+  const problems = usingExisting
+    ? validateDraft({
+        ...draft,
+        campaignName: draft.campaignName || "existing",
+        dailyBudget: draft.dailyBudget || "1",
+        countries: draft.countries || "GB",
+        pixelId: draft.pixelId ?? "inherited",
+      })
+    : validateDraft(draft);
   if (problems.length > 0) {
     return {
       ...empty,
@@ -135,62 +163,70 @@ export async function launchBatchAction(
   let campaignId: string | null = null;
   let adSetId: string | null = null;
 
-  try {
-    const campaign = await createCampaign(
-      account,
-      token,
-      {
-        name: draft.campaignName,
-        objective: draft.objective,
-        dailyBudgetMinor: toMinorUnits(draft.dailyBudget),
-      },
-      dryRun,
-    );
-    campaignId = campaign.id ?? null;
+  // Launching into an existing ad set skips creation entirely: its targeting,
+  // budget, schedule and pixel are already set and are not ours to redefine.
+  if (usingExisting) {
+    adSetId = draft.existingAdSetId ?? null;
+  }
 
-    // A validate-only campaign returns no id, and an ad set cannot be checked
-    // without a real parent. Rather than validate against an empty id — which
-    // fails for a reason that has nothing to do with the draft — the dry run
-    // stops here and says what it did and did not cover.
-    if (dryRun && !campaignId) {
+  if (!usingExisting) {
+    try {
+      const campaign = await createCampaign(
+        account,
+        token,
+        {
+          name: draft.campaignName,
+          objective: draft.objective,
+          dailyBudgetMinor: toMinorUnits(draft.dailyBudget),
+        },
+        dryRun,
+      );
+      campaignId = campaign.id ?? null;
+
+      // A validate-only campaign returns no id, and an ad set cannot be checked
+      // without a real parent. Rather than validate against an empty id — which
+      // fails for a reason that has nothing to do with the draft — the dry run
+      // stops here and says what it did and did not cover.
+      if (dryRun && !campaignId) {
+        return {
+          ...empty,
+          status: "success",
+          campaignId: null,
+          message:
+            "Campaign settings are valid. The ad set and ads cannot be checked without a real campaign to attach them to, so this dry run stops here.",
+        };
+      }
+
+      const adSet = await createAdSet(
+        account,
+        token,
+        {
+          name: `${draft.campaignName} — ad set`,
+          campaignId: campaignId ?? "",
+          // The campaign holds the budget (CBO), so the ad set must not.
+          dailyBudgetMinor: null,
+          countries: parseCountries(draft.countries),
+          ageMin: draft.ageMin,
+          ageMax: draft.ageMax,
+          startTime: draft.startTime,
+          endTime: null,
+          pixelId: draft.pixelId,
+          customEventType: draft.customEventType,
+          optimizationGoal: optimizationGoalFor(draft.objective),
+          billingEvent: BILLING_EVENT,
+        },
+        dryRun,
+      );
+      adSetId = adSet.id ?? null;
+    } catch (error) {
       return {
         ...empty,
-        status: "success",
-        campaignId: null,
-        message:
-          "Campaign settings are valid. The ad set and ads cannot be checked without a real campaign to attach them to, so this dry run stops here.",
+        status: "failed",
+        campaignId,
+        message: describe(error),
+        blocker: blockerFor(error),
       };
     }
-
-    const adSet = await createAdSet(
-      account,
-      token,
-      {
-        name: `${draft.campaignName} — ad set`,
-        campaignId: campaignId ?? "",
-        // The campaign holds the budget (CBO), so the ad set must not.
-        dailyBudgetMinor: null,
-        countries: parseCountries(draft.countries),
-        ageMin: draft.ageMin,
-        ageMax: draft.ageMax,
-        startTime: draft.startTime,
-        endTime: null,
-        pixelId: draft.pixelId,
-        customEventType: draft.customEventType,
-        optimizationGoal: optimizationGoalFor(draft.objective),
-        billingEvent: BILLING_EVENT,
-      },
-      dryRun,
-    );
-    adSetId = adSet.id ?? null;
-  } catch (error) {
-    return {
-      ...empty,
-      status: "failed",
-      campaignId,
-      message: describe(error),
-      blocker: blockerFor(error),
-    };
   }
 
   const results: AdResult[] = [];
@@ -323,4 +359,145 @@ export async function launchBatchAction(
         ? `${succeeded} ad${succeeded === 1 ? "" : "s"} ${verb}${dryRun ? " — nothing was actually created" : ` as ${draft.adStatus}`}.`
         : `${succeeded} ${verb}, ${failed} failed.`,
   };
+}
+
+/**
+ * The pixels on one ad account.
+ *
+ * A Server Action rather than data passed down once, because pixels belong to
+ * an account and the account is chosen in the form. Loading them for the
+ * default account and leaving the list alone meant picking a different account
+ * kept showing the first one's pixels — and binding an ad set to a pixel from
+ * another account is the kind of mistake that reports conversions against the
+ * wrong store.
+ *
+ * The token never leaves the server, which is the other reason this cannot be
+ * a fetch from the client.
+ */
+export async function listAccountPixelsAction(
+  adAccountId: string,
+): Promise<{ pixels: { id: string; label: string }[]; error: string | null }> {
+  const { denied } = await requireUserId();
+  if (denied) return { pixels: [], error: denied.message ?? "Not signed in." };
+
+  const connection = await getConnection();
+  if (!connection) {
+    return { pixels: [], error: "No Meta account is connected." };
+  }
+
+  try {
+    const found = await listPixels(adAccountId, connection.access_token);
+    return {
+      pixels: found.map((pixel) => ({ id: pixel.id, label: pixel.name })),
+      error: null,
+    };
+  } catch (error) {
+    return { pixels: [], error: describe(error) };
+  }
+}
+
+/**
+ * Campaigns on an account, for launching into one that already runs.
+ *
+ * The builder only created new campaigns, which does not match how these
+ * accounts are actually used: their ad sets are named things like "Adset (2)
+ * … 30 Creatives", meaning creatives are pushed into an ad set that already
+ * has targeting, a budget, a pixel and a schedule. Rebuilding all of that for
+ * every batch would be both laborious and a good way to get one setting wrong.
+ */
+export async function listAccountCampaignsAction(adAccountId: string): Promise<{
+  campaigns: { id: string; label: string; hasBudget: boolean }[];
+  error: string | null;
+}> {
+  const { denied } = await requireUserId();
+  if (denied)
+    return { campaigns: [], error: denied.message ?? "Not signed in." };
+
+  const connection = await getConnection();
+  if (!connection)
+    return { campaigns: [], error: "No Meta account is connected." };
+
+  try {
+    const found = await listCampaigns(adAccountId, connection.access_token);
+    return {
+      campaigns: found.map((campaign) => ({
+        id: campaign.id,
+        label: `${campaign.name}${campaign.status === "PAUSED" ? " (paused)" : ""}`,
+        // A campaign-level budget means CBO, and an ad set under it must not
+        // carry its own — worth knowing before the ad set is built.
+        hasBudget: Boolean(campaign.dailyBudget || campaign.lifetimeBudget),
+      })),
+      error: null,
+    };
+  } catch (error) {
+    return { campaigns: [], error: describe(error) };
+  }
+}
+
+/** Ad sets under a campaign, with what each already decides for its ads. */
+export async function listCampaignAdSetsAction(campaignId: string): Promise<{
+  adSets: { id: string; label: string }[];
+  error: string | null;
+}> {
+  const { denied } = await requireUserId();
+  if (denied) return { adSets: [], error: denied.message ?? "Not signed in." };
+
+  const connection = await getConnection();
+  if (!connection)
+    return { adSets: [], error: "No Meta account is connected." };
+
+  try {
+    const found = await listAdSets(campaignId, connection.access_token);
+    return {
+      adSets: found.map((adSet) => ({
+        id: adSet.id,
+        label: `${adSet.name}${adSet.status === "PAUSED" ? " (paused)" : ""}`,
+      })),
+      error: null,
+    };
+  } catch (error) {
+    return { adSets: [], error: describe(error) };
+  }
+}
+
+/** What an existing ad set already governs, so the choice can be verified. */
+export async function describeAdSetAction(adSetId: string): Promise<{
+  details: {
+    startTime: string | null;
+    pixelId: string | null;
+    customEventType: string | null;
+    optimizationGoal: string | null;
+    dailyBudget: string | null;
+    countries: string[];
+    ageMin: number | null;
+    ageMax: number | null;
+  } | null;
+  error: string | null;
+}> {
+  const { denied } = await requireUserId();
+  if (denied)
+    return { details: null, error: denied.message ?? "Not signed in." };
+
+  const connection = await getConnection();
+  if (!connection)
+    return { details: null, error: "No Meta account is connected." };
+
+  try {
+    const details = await getAdSetDetails(adSetId, connection.access_token);
+    return {
+      details: {
+        startTime: details.startTime,
+        pixelId: details.pixelId,
+        customEventType: details.customEventType,
+        optimizationGoal: details.optimizationGoal,
+        dailyBudget: details.dailyBudget,
+        countries: details.countries,
+        ageMin: details.ageMin,
+        ageMax: details.ageMax,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return { details: null, error: describe(error) };
+  }
 }
