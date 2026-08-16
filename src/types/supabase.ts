@@ -163,6 +163,7 @@ export type Database = {
       }
       ad_insights_daily: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -193,6 +194,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -223,6 +225,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -264,6 +267,7 @@ export type Database = {
       }
       ad_insights_daily_202507: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -294,6 +298,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -324,6 +329,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -357,6 +363,7 @@ export type Database = {
       }
       ad_insights_daily_202508: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -387,6 +394,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -417,6 +425,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -450,6 +459,7 @@ export type Database = {
       }
       ad_insights_daily_202509: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -480,6 +490,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -510,6 +521,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -543,6 +555,7 @@ export type Database = {
       }
       ad_insights_daily_202510: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -573,6 +586,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -603,6 +617,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -636,6 +651,7 @@ export type Database = {
       }
       ad_insights_daily_202511: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -666,6 +682,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -696,6 +713,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -729,6 +747,7 @@ export type Database = {
       }
       ad_insights_daily_202512: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -759,6 +778,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -789,6 +809,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -822,6 +843,7 @@ export type Database = {
       }
       ad_insights_daily_202601: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -852,6 +874,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -882,6 +905,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -915,6 +939,7 @@ export type Database = {
       }
       ad_insights_daily_202602: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -945,6 +970,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -975,6 +1001,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1008,6 +1035,7 @@ export type Database = {
       }
       ad_insights_daily_202603: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -1038,6 +1066,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1068,6 +1097,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1101,6 +1131,7 @@ export type Database = {
       }
       ad_insights_daily_202604: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -1131,6 +1162,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1161,6 +1193,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1194,6 +1227,7 @@ export type Database = {
       }
       ad_insights_daily_202605: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -1224,6 +1258,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1254,6 +1289,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1287,6 +1323,7 @@ export type Database = {
       }
       ad_insights_daily_202606: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -1317,6 +1354,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1347,6 +1385,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1380,6 +1419,7 @@ export type Database = {
       }
       ad_insights_daily_202607: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -1410,6 +1450,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1440,6 +1481,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1473,6 +1515,7 @@ export type Database = {
       }
       ad_insights_daily_202608: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           add_to_cart_value: number
           clicks: number
@@ -1503,6 +1546,7 @@ export type Database = {
           video_thruplays: number
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -1533,6 +1577,7 @@ export type Database = {
           video_thruplays?: number
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           add_to_cart_value?: number
           clicks?: number
@@ -2028,6 +2073,7 @@ export type Database = {
       }
       creative_metrics: {
         Row: {
+          ad_account_id: string | null
           add_to_cart: number
           clicks: number
           composite_score: number | null
@@ -2061,6 +2107,7 @@ export type Database = {
           window_start: string | null
         }
         Insert: {
+          ad_account_id?: string | null
           add_to_cart?: number
           clicks?: number
           composite_score?: number | null
@@ -2094,6 +2141,7 @@ export type Database = {
           window_start?: string | null
         }
         Update: {
+          ad_account_id?: string | null
           add_to_cart?: number
           clicks?: number
           composite_score?: number | null
@@ -2212,8 +2260,57 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_ad_accounts: {
+        Row: {
+          account_status: number | null
+          ad_account_id: string
+          business_name: string | null
+          created_at: string
+          currency: string | null
+          first_seen_at: string
+          id: string
+          is_default: boolean
+          is_selected: boolean
+          last_synced_at: string | null
+          name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_status?: number | null
+          ad_account_id: string
+          business_name?: string | null
+          created_at?: string
+          currency?: string | null
+          first_seen_at?: string
+          id?: string
+          is_default?: boolean
+          is_selected?: boolean
+          last_synced_at?: string | null
+          name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_status?: number | null
+          ad_account_id?: string
+          business_name?: string | null
+          created_at?: string
+          currency?: string | null
+          first_seen_at?: string
+          id?: string
+          is_default?: boolean
+          is_selected?: boolean
+          last_synced_at?: string | null
+          name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       meta_ad_entities: {
         Row: {
+          ad_account_id: string | null
           created_at: string
           creative_meta_id: string | null
           effective_status: string | null
@@ -2232,6 +2329,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ad_account_id?: string | null
           created_at?: string
           creative_meta_id?: string | null
           effective_status?: string | null
@@ -2250,6 +2348,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ad_account_id?: string | null
           created_at?: string
           creative_meta_id?: string | null
           effective_status?: string | null
@@ -2327,6 +2426,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meta_pages: {
+        Row: {
+          created_at: string
+          id: string
+          instagram_actor_id: string | null
+          is_default: boolean
+          name: string | null
+          page_access_token: string | null
+          page_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instagram_actor_id?: string | null
+          is_default?: boolean
+          name?: string | null
+          page_access_token?: string | null
+          page_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instagram_actor_id?: string | null
+          is_default?: boolean
+          name?: string | null
+          page_access_token?: string | null
+          page_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
