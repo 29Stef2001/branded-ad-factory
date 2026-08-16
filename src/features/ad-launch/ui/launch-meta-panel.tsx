@@ -170,8 +170,34 @@ function StatusExplanation({ status }: { status: LaunchStatus }) {
     case "ready":
       return (
         <Setup
-          title="Draft creation is not implemented yet."
-          body="This connection does hold ads_management, so drafting is possible in principle. The Graph API calls that would create the campaign, ad set and creative have not been written — this panel reports capability only."
+          title="Launching from here is not built yet — and Meta would block it today."
+          body={
+            <>
+              <span className="block">
+                This connection holds{" "}
+                <span className="font-mono text-[13px]">ads_management</span>,
+                and creating a campaign and ad set has been verified to work.
+                The creative — the part that makes an ad visible — is refused,
+                because the Meta app is still in Development mode: &ldquo;Ads
+                creative post was created by an app that is in development
+                mode&rdquo;.
+              </span>
+              <span className="mt-2 block">
+                Switching the app to Live is the next step. Until then, create
+                the ad in Ads Manager by hand and paste the concept code into
+                its name — performance then links back to the concept exactly,
+                with nothing to confirm.
+              </span>
+            </>
+          }
+          action={
+            <Link
+              href="/dashboard/concepts"
+              className={buttonVariants({ size: "sm" })}
+            >
+              Get a concept code
+            </Link>
+          }
         />
       );
   }

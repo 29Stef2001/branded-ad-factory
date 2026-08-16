@@ -110,8 +110,13 @@ export function buildWorkflow(input: WorkflowInput): WorkflowStep[] {
       key: "launch",
       label: "Launch in Meta",
       href: "/dashboard/ad-factory/launch",
+      // Says what is true rather than what the permission implies. The check
+      // below is on ads_management, and holding it made this read "ready to
+      // draft" — so the step invited a click through to a panel that creates
+      // nothing. Drafting is not built, and a workflow that overstates its own
+      // last step is worse than one that admits the gap.
       detail: input.metaCanLaunch
-        ? "ready to draft"
+        ? "permission granted — drafting not built yet"
         : "read-only access — needs Meta App Review",
     },
   ];
