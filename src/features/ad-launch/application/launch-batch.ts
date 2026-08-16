@@ -114,6 +114,25 @@ export async function launchBatchAction(
      * someone has already tuned.
      */
     existingAdSetId?: string | null;
+    /**
+     * Build a new ad set inside a campaign that already exists.
+     *
+     * The middle case, and the common one: the campaign holds the budget and
+     * the objective, and a new ad set brings its own targeting, schedule and
+     * pixel. Creating a fresh campaign for every test would scatter the budget
+     * across campaigns that were meant to share it.
+     */
+    existingCampaignId?: string | null;
+    /**
+     * Whether that campaign carries the budget.
+     *
+     * Exactly one level may hold it. A CBO campaign rejects an ad set with its
+     * own budget, and a campaign without one rejects an ad set that has none —
+     * so this cannot be guessed, and getting it wrong fails at creation with an
+     * error that does not name the cause.
+     */
+    existingCampaignHasBudget?: boolean;
+    includeThreads?: boolean;
   },
 ): Promise<LaunchResult> {
   const { userId, denied } = await requireUserId();
@@ -126,6 +145,8 @@ export async function launchBatchAction(
   }
 
   const usingExisting = Boolean(draft.existingAdSetId);
+  const usingExistingCampaign =
+    !usingExisting && Boolean(draft.existingCampaignId);
   // Campaign and ad set fields describe something that will not be created
   // when an existing ad set is chosen, so validating them would reject a
   // perfectly good batch for fields nobody filled in.
@@ -137,7 +158,16 @@ export async function launchBatchAction(
         countries: draft.countries || "GB",
         pixelId: draft.pixelId ?? "inherited",
       })
-    : validateDraft(draft);
+    : usingExistingCampaign
+      ? // The campaign already exists, so its name and budget are not being
+        // set here — but the ad set's targeting and pixel are, and those are
+        // validated as normal.
+        validateDraft({
+          ...draft,
+          campaignName: draft.campaignName || "existing",
+          dailyBudget: draft.dailyBudget || "1",
+        })
+      : validateDraft(draft);
   if (problems.length > 0) {
     return {
       ...empty,
@@ -171,17 +201,21 @@ export async function launchBatchAction(
 
   if (!usingExisting) {
     try {
-      const campaign = await createCampaign(
-        account,
-        token,
-        {
-          name: draft.campaignName,
-          objective: draft.objective,
-          dailyBudgetMinor: toMinorUnits(draft.dailyBudget),
-        },
-        dryRun,
-      );
-      campaignId = campaign.id ?? null;
+      if (usingExistingCampaign) {
+        campaignId = draft.existingCampaignId ?? null;
+      } else {
+        const campaign = await createCampaign(
+          account,
+          token,
+          {
+            name: draft.campaignName,
+            objective: draft.objective,
+            dailyBudgetMinor: toMinorUnits(draft.dailyBudget),
+          },
+          dryRun,
+        );
+        campaignId = campaign.id ?? null;
+      }
 
       // A validate-only campaign returns no id, and an ad set cannot be checked
       // without a real parent. Rather than validate against an empty id — which
@@ -203,8 +237,14 @@ export async function launchBatchAction(
         {
           name: `${draft.campaignName} — ad set`,
           campaignId: campaignId ?? "",
-          // The campaign holds the budget (CBO), so the ad set must not.
-          dailyBudgetMinor: null,
+          // Exactly one level holds the budget. A new campaign always takes it
+          // here, so its ad set must not; an existing campaign might not have
+          // one, in which case the ad set has to — Meta rejects both the
+          // duplicate and the absence, with errors that do not name the cause.
+          dailyBudgetMinor:
+            usingExistingCampaign && !draft.existingCampaignHasBudget
+              ? toMinorUnits(draft.dailyBudget)
+              : null,
           countries: parseCountries(draft.countries),
           ageMin: draft.ageMin,
           ageMax: draft.ageMax,
@@ -214,6 +254,7 @@ export async function launchBatchAction(
           customEventType: draft.customEventType,
           optimizationGoal: optimizationGoalFor(draft.objective),
           billingEvent: BILLING_EVENT,
+          includeThreads: draft.includeThreads ?? false,
         },
         dryRun,
       );

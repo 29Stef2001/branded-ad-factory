@@ -370,7 +370,24 @@ export type AdSetInput = {
   customEventType: string;
   optimizationGoal: string;
   billingEvent: string;
+  /**
+   * Whether ads may appear on Threads.
+   *
+   * Off means naming the other platforms explicitly, since there is no
+   * "exclude one" switch — and naming any of them turns off Advantage+
+   * placements, so Meta stops adding new surfaces on its own. That trade is
+   * the reason this is a deliberate choice rather than a default.
+   */
+  includeThreads: boolean;
 };
+
+/** Everything except Threads. Listing these is how Threads is excluded. */
+const PLACEMENTS_WITHOUT_THREADS = [
+  "facebook",
+  "instagram",
+  "audience_network",
+  "messenger",
+];
 
 /**
  * Creates an ad set, always paused.
@@ -392,6 +409,12 @@ export async function createAdSet(
     age_min: input.ageMin,
     age_max: input.ageMax,
   };
+
+  if (!input.includeThreads) {
+    // Omitting publisher_platforms entirely leaves Meta free to place ads
+    // anywhere it likes, Threads included.
+    targeting.publisher_platforms = PLACEMENTS_WITHOUT_THREADS;
+  }
 
   return graphPost<{ id: string }>(
     `${adAccountId}/adsets`,

@@ -79,13 +79,20 @@ export function LaunchBuilder({
   const [pixelId, setPixelId] = useState(pixels[0]?.id ?? "");
   const [customEventType, setCustomEventType] = useState("PURCHASE");
   const [adStatus, setAdStatus] = useState<"PAUSED" | "ACTIVE">("PAUSED");
+  // Off by default. Threads is a placement most of these campaigns do not
+  // want, and it is included automatically unless the platforms are named.
+  const [includeThreads, setIncludeThreads] = useState(false);
   const [ads, setAds] = useState<AdDraft[]>([newAd()]);
 
   // Existing structure. These accounts push creatives into an ad set someone
   // has already tuned, so that is the default way of working rather than an
   // alternative buried behind a toggle.
-  const [mode, setMode] = useState<"existing" | "new">("existing");
-  const [campaigns, setCampaigns] = useState<Option[]>([]);
+  const [mode, setMode] = useState<"existing" | "new-adset" | "new">(
+    "existing",
+  );
+  const [campaigns, setCampaigns] = useState<
+    (Option & { hasBudget: boolean })[]
+  >([]);
   const [campaignId, setCampaignId] = useState("");
   const [adSets, setAdSets] = useState<Option[]>([]);
   const [existingAdSetId, setExistingAdSetId] = useState("");
@@ -199,6 +206,11 @@ export function LaunchBuilder({
         pixelId: requiresPixel(objective) ? pixelId || null : null,
         customEventType,
         existingAdSetId: mode === "existing" ? existingAdSetId : null,
+        existingCampaignId: mode === "new-adset" ? campaignId : null,
+        includeThreads,
+        existingCampaignHasBudget:
+          campaigns.find((campaign) => campaign.id === campaignId)?.hasBudget ??
+          false,
         ads: ads.map((ad) => ({
           primaryText: ad.primaryText,
           headline: ad.headline,
@@ -259,7 +271,9 @@ export function LaunchBuilder({
         description={
           mode === "existing"
             ? "Add these ads to an ad set that already runs. Its targeting, budget, schedule and pixel stay exactly as they are."
-            : "Created together, always paused. The budget sits on the campaign, so Meta distributes it across ad sets itself."
+            : mode === "new-adset"
+              ? "A new ad set inside a campaign that already exists. The campaign keeps its objective; the ad set brings its own targeting, schedule and pixel."
+              : "Created together, always paused. The budget sits on the campaign, so Meta distributes it across ad sets itself."
         }
         contentClassName="flex flex-col gap-3"
       >
@@ -275,12 +289,49 @@ export function LaunchBuilder({
           <Button
             type="button"
             size="sm"
+            variant={mode === "new-adset" ? "default" : "outline"}
+            onClick={() => setMode("new-adset")}
+          >
+            New ad set in an existing campaign
+          </Button>
+          <Button
+            type="button"
+            size="sm"
             variant={mode === "new" ? "default" : "outline"}
             onClick={() => setMode("new")}
           >
             Create a new campaign
           </Button>
         </div>
+
+        {mode === "new-adset" && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium">Campaign</span>
+            <select
+              value={campaignId}
+              onChange={(event) => setCampaignId(event.target.value)}
+              className="h-9 rounded-md border border-border bg-transparent px-2 text-sm"
+            >
+              <option value="">
+                {campaigns.length === 0
+                  ? "No campaigns found on this account"
+                  : "Pick a campaign…"}
+              </option>
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.label}
+                </option>
+              ))}
+            </select>
+            {campaignId && (
+              <span className="text-xs text-muted-foreground">
+                {campaigns.find((c) => c.id === campaignId)?.hasBudget
+                  ? "This campaign holds the budget, so the ad set does not take one."
+                  : "This campaign has no budget of its own, so the ad set needs the daily budget below."}
+              </span>
+            )}
+          </label>
+        )}
 
         {mode === "existing" ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -338,6 +389,8 @@ export function LaunchBuilder({
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
+            {/* The campaign's own fields are only asked for when one is being
+                created; an existing campaign already has them. */}
             <label className="flex flex-col gap-1 sm:col-span-2">
               <span className="text-xs font-medium">Campaign name</span>
               <Input
@@ -522,9 +575,30 @@ export function LaunchBuilder({
         description="A dry run asks Meta to validate everything and create nothing. Worth doing first — it is the only way to find out whether Meta accepts these settings without finding out the expensive way."
         contentClassName="flex flex-col gap-3"
       >
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-start gap-2 text-sm">
           <input
             type="checkbox"
+            className="mt-1"
+            checked={includeThreads}
+            onChange={(event) => setIncludeThreads(event.target.checked)}
+            disabled={mode === "existing"}
+          />
+          <span>
+            Show these ads on Threads
+            <span className="ml-2 text-xs text-muted-foreground">
+              {mode === "existing"
+                ? "The existing ad set decides its own placements — this does not apply."
+                : includeThreads
+                  ? "Meta places the ads wherever it likes, Threads included."
+                  : "Facebook, Instagram, Audience Network and Messenger only. Naming the placements also turns off Advantage+ placements, so Meta will not add new surfaces on its own."}
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
             checked={adStatus === "ACTIVE"}
             onChange={(event) =>
               setAdStatus(event.target.checked ? "ACTIVE" : "PAUSED")
