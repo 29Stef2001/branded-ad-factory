@@ -186,6 +186,67 @@ export async function listAdSets(
   );
 }
 
+export type AdSetDetails = {
+  id: string;
+  name: string;
+  status: string | null;
+  /** When delivery starts. Already set on the ad set, not per ad. */
+  startTime: string | null;
+  endTime: string | null;
+  dailyBudget: string | null;
+  optimizationGoal: string | null;
+  billingEvent: string | null;
+  /** The pixel and conversion event this ad set optimises for. */
+  pixelId: string | null;
+  customEventType: string | null;
+  countries: string[];
+  ageMin: number | null;
+  ageMax: number | null;
+};
+
+/**
+ * Everything an ad set already decides on behalf of the ads inside it.
+ *
+ * Shown before launching rather than asked for, because these are not the
+ * launcher's to set: the pixel, the conversion event, the schedule, the budget
+ * and the targeting all live here. Choosing an ad set *is* choosing them. The
+ * screen displays them so the choice is verified rather than assumed — picking
+ * the wrong ad set is otherwise invisible until the money has moved.
+ */
+export async function getAdSetDetails(
+  adSetId: string,
+  accessToken: string,
+): Promise<AdSetDetails> {
+  const params = new URLSearchParams({
+    fields:
+      "id,name,status,start_time,end_time,daily_budget,optimization_goal,billing_event,promoted_object,targeting",
+    access_token: accessToken,
+  });
+
+  const response = await fetch(`${GRAPH_BASE}/${adSetId}?${params.toString()}`);
+  const body = await response.json();
+  if (!response.ok || body.error) throw toLaunchError(body);
+
+  const promoted = body.promoted_object ?? {};
+  const targeting = body.targeting ?? {};
+
+  return {
+    id: body.id,
+    name: body.name,
+    status: body.status ?? null,
+    startTime: body.start_time ?? null,
+    endTime: body.end_time ?? null,
+    dailyBudget: body.daily_budget ?? null,
+    optimizationGoal: body.optimization_goal ?? null,
+    billingEvent: body.billing_event ?? null,
+    pixelId: promoted.pixel_id ?? null,
+    customEventType: promoted.custom_event_type ?? null,
+    countries: targeting.geo_locations?.countries ?? [],
+    ageMin: targeting.age_min ?? null,
+    ageMax: targeting.age_max ?? null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Creating
 // ---------------------------------------------------------------------------
@@ -284,10 +345,29 @@ export async function createAdCreative(
   );
 }
 
+/**
+ * Whether the new ads start delivering.
+ *
+ * PAUSED is the default and the safe answer, but not the only allowed one:
+ * launching ads that actually run is the point of a launcher, and forcing
+ * every batch to be switched on by hand in Ads Manager afterwards just moves
+ * the risk somewhere with less context. ACTIVE is deliberate — the caller has
+ * to ask for it, and the screen states what will begin spending.
+ *
+ * Either way the ad set governs *when*: an ad set with a future start_time
+ * does not deliver today just because its ads are active.
+ */
+export type LaunchStatus = "PAUSED" | "ACTIVE";
+
 export async function createAd(
   adAccountId: string,
   accessToken: string,
-  input: { name: string; adsetId: string; creativeId: string },
+  input: {
+    name: string;
+    adsetId: string;
+    creativeId: string;
+    status: LaunchStatus;
+  },
   validateOnly = false,
 ): Promise<{ id: string }> {
   return graphPost<{ id: string }>(
@@ -296,9 +376,7 @@ export async function createAd(
       name: input.name,
       adset_id: input.adsetId,
       creative: JSON.stringify({ creative_id: input.creativeId }),
-      // Never anything else. An ad this app creates does not start spending on
-      // its own; someone has to turn it on in Ads Manager.
-      status: "PAUSED",
+      status: input.status,
     },
     accessToken,
     validateOnly,
