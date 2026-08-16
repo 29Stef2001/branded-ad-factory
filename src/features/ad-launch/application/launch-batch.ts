@@ -15,6 +15,7 @@ import {
   createAdSet,
   createCampaign,
   getAdSetDetails,
+  uploadAdVideo,
   listAdSets,
   listCampaigns,
   listPixels,
@@ -27,6 +28,7 @@ import {
   listConcepts,
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 import { recordBatch } from "@/features/ad-launch/infrastructure/launch-repository";
+import { isVideo } from "@/features/ad-launch/domain/media";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 
 /**
@@ -278,8 +280,18 @@ export async function launchBatchAction(
 
   for (const [index, ad] of draft.ads.entries()) {
     try {
-      const image = await fetchImageBytes(ad.imageUrl);
-      const imageHash = await uploadAdImage(account, token, image);
+      const media = await fetchImageBytes(ad.imageUrl);
+
+      // Videos take a different endpoint and a different creative shape, and
+      // Meta transcodes them before they can be used — so this branches before
+      // the upload rather than trying to patch up a link_data creative after.
+      const asVideo = isVideo(ad.imageUrl);
+      const videoId = asVideo
+        ? await uploadAdVideo(account, token, media)
+        : null;
+      const imageHash = asVideo
+        ? ""
+        : await uploadAdImage(account, token, media);
 
       const creative = await createAdCreative(
         account,
@@ -288,6 +300,7 @@ export async function launchBatchAction(
           name: `${draft.campaignName} — ${ad.headline}`.slice(0, 100),
           pageId: draft.pageId,
           imageHash,
+          videoId,
           primaryText: ad.primaryText,
           headline: ad.headline,
           description: ad.description || null,

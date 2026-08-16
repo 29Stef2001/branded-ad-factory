@@ -444,9 +444,97 @@ export async function createAdSet(
   );
 }
 
+/**
+ * Uploads a video and waits for Meta to finish processing it.
+ *
+ * Unlike an image, a video is not usable the moment it is accepted: Meta
+ * transcodes it, and creating a creative against one still in `processing`
+ * fails with an error that says nothing about waiting. So this polls until it
+ * is ready, which is the difference between a batch that works and one that
+ * fails on every video for no visible reason.
+ */
+export async function uploadAdVideo(
+  adAccountId: string,
+  accessToken: string,
+  video: { filename: string; bytes: Uint8Array },
+  options: { timeoutMs?: number } = {},
+): Promise<string> {
+  const form = new FormData();
+  form.set("access_token", accessToken);
+  form.set("source", new Blob([new Uint8Array(video.bytes)]), video.filename);
+  form.set("name", video.filename);
+
+  const response = await fetch(`${GRAPH_BASE}/${adAccountId}/advideos`, {
+    method: "POST",
+    body: form,
+  });
+  const body = await response.json();
+  if (!response.ok || body.error) throw toLaunchError(body);
+
+  const videoId = body.id as string | undefined;
+  if (!videoId) {
+    throw new MetaLaunchError(
+      "Meta accepted the video but returned no id.",
+      null,
+      null,
+      null,
+    );
+  }
+
+  await waitForVideo(videoId, accessToken, options.timeoutMs ?? 180_000);
+  return videoId;
+}
+
+/** Polls until Meta has transcoded the video, or gives up with a clear reason. */
+async function waitForVideo(
+  videoId: string,
+  accessToken: string,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  for (;;) {
+    const params = new URLSearchParams({
+      fields: "status",
+      access_token: accessToken,
+    });
+    const response = await fetch(
+      `${GRAPH_BASE}/${videoId}?${params.toString()}`,
+    );
+    const body = await response.json();
+    if (!response.ok || body.error) throw toLaunchError(body);
+
+    const phase = body.status?.video_status as string | undefined;
+    if (phase === "ready") return;
+
+    if (phase === "error") {
+      throw new MetaLaunchError(
+        "Meta could not process this video.",
+        null,
+        null,
+        body.status?.processing_progress
+          ? `Stopped at ${body.status.processing_progress}%.`
+          : null,
+      );
+    }
+
+    if (Date.now() > deadline) {
+      throw new MetaLaunchError(
+        "Meta is still processing this video.",
+        null,
+        null,
+        "Uploaded successfully but not ready in time. It usually finishes on its own — try again in a few minutes.",
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
 export type CreativeInput = {
   name: string;
   pageId: string;
+  /** Empty for a video ad. */
   imageHash: string;
   /** The body text above the image. */
   primaryText: string;
@@ -455,6 +543,14 @@ export type CreativeInput = {
   linkUrl: string;
   callToAction: string;
   instagramActorId: string | null;
+  /**
+   * Set for a video ad. Meta uses a different story spec entirely — video_data
+   * rather than link_data — so this is not an optional extra field but a fork
+   * in what is being created.
+   */
+  videoId?: string | null;
+  /** Thumbnail for the video. Meta requires one. */
+  videoThumbnailUrl?: string | null;
 };
 
 export async function createAdCreative(
@@ -463,17 +559,37 @@ export async function createAdCreative(
   input: CreativeInput,
   validateOnly = false,
 ): Promise<{ id: string }> {
-  const storySpec: Record<string, unknown> = {
-    page_id: input.pageId,
-    link_data: {
-      image_hash: input.imageHash,
-      link: input.linkUrl,
-      message: input.primaryText,
-      name: input.headline,
-      ...(input.description ? { description: input.description } : {}),
-      call_to_action: { type: input.callToAction },
-    },
-  };
+  const storySpec: Record<string, unknown> = input.videoId
+    ? {
+        page_id: input.pageId,
+        video_data: {
+          video_id: input.videoId,
+          // Meta rejects a video creative without a thumbnail. When one was
+          // not given it falls back to the frame Meta picked itself.
+          ...(input.videoThumbnailUrl
+            ? { image_url: input.videoThumbnailUrl }
+            : {}),
+          message: input.primaryText,
+          title: input.headline,
+          ...(input.description ? { link_description: input.description } : {}),
+          // The link lives inside the call to action for video, not beside it.
+          call_to_action: {
+            type: input.callToAction,
+            value: { link: input.linkUrl },
+          },
+        },
+      }
+    : {
+        page_id: input.pageId,
+        link_data: {
+          image_hash: input.imageHash,
+          link: input.linkUrl,
+          message: input.primaryText,
+          name: input.headline,
+          ...(input.description ? { description: input.description } : {}),
+          call_to_action: { type: input.callToAction },
+        },
+      };
 
   if (input.instagramActorId) {
     storySpec.instagram_actor_id = input.instagramActorId;

@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Images, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { mediaKindFor } from "@/features/ad-launch/domain/media";
 
 export type ImageEntry = {
   url: string;
@@ -57,10 +58,10 @@ export function ImageList({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
-        <span className="text-sm font-medium">Paste image URLs</span>
+        <span className="text-sm font-medium">Paste creative URLs</span>
         <p className="text-xs text-muted-foreground">
-          One per line. Each becomes its own ad, in this order, sharing the copy
-          above.
+          One per line — images or videos. Each becomes its own ad, in this
+          order, sharing the copy above.
         </p>
         <Textarea
           rows={4}
@@ -114,14 +115,29 @@ export function ImageList({
                 <span className="w-6 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
-                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL */}
-                <img
-                  src={image.url}
-                  alt=""
-                  className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
-                />
+                {mediaKindFor(image.url) === "video" ? (
+                  <video
+                    src={image.url}
+                    muted
+                    className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL
+                  <img
+                    src={image.url}
+                    alt=""
+                    className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
+                  />
+                )}
                 <span className="min-w-40 flex-1 truncate font-mono text-xs text-muted-foreground">
                   {image.url}
+                  {mediaKindFor(image.url) === "unknown" && (
+                    // Meta needs to know before uploading: videos and images go
+                    // to different endpoints entirely.
+                    <span className="ml-2 text-warning">
+                      unrecognised file type — will be uploaded as an image
+                    </span>
+                  )}
                 </span>
                 <div className="flex items-center gap-1">
                   <Button
