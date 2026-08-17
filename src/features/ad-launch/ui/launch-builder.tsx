@@ -601,8 +601,8 @@ export function LaunchBuilder({
       </DarkPanel>
 
       <DarkPanel
-        title={`4 · Images (${images.length})`}
-        description="One ad per image, in this order."
+        title={`4 · Creatives (${images.length})`}
+        description="One ad per creative, in this order. Images and videos both."
         contentClassName="flex flex-col gap-3"
       >
         <ConceptPicker

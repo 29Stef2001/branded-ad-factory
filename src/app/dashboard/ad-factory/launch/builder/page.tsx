@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { sectionFor } from "@/components/shell/nav-config";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LaunchBuilder } from "@/features/ad-launch/ui/launch-builder";
+import { StoreSummary } from "@/features/ad-launch/ui/store-summary";
 import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
 import { listPixels } from "@/features/ad-launch/infrastructure/meta-launch-client";
 import {
@@ -10,23 +11,32 @@ import {
   listSelectedAdAccounts,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import { canRunAds } from "@/features/creative-intelligence/domain/account-status";
+import {
+  getBrandProfile,
+  listBrandAssets,
+} from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
+import { assessBrandCompleteness } from "@/features/ad-concepts/domain/brand-completeness";
 
 export const metadata: Metadata = {
   title: "Launch ads — Branded Ad Factory",
 };
 
-// Uploading images and creating ads one at a time takes real time on a batch.
+// Uploading media and creating ads one at a time takes real time on a batch.
 export const maxDuration = 300;
 
 export default async function LaunchBuilderPage() {
-  const [accounts, pages, connection] = await Promise.all([
-    listSelectedAdAccounts(),
-    listPages(),
-    getConnection(),
-  ]);
+  const [accounts, pages, connection, brandProfile, assets] = await Promise.all(
+    [
+      listSelectedAdAccounts(),
+      listPages(),
+      getConnection(),
+      getBrandProfile(),
+      listBrandAssets(),
+    ],
+  );
 
   // Only accounts that can actually run ads: offering a disabled one would
-  // produce a failure Meta explains and this app could have prevented.
+  // produce a failure Meta explains and this app already knew was coming.
   const usable = accounts.filter((account) =>
     canRunAds(account.account_status),
   );
@@ -49,12 +59,16 @@ export default async function LaunchBuilderPage() {
     }
   }
 
+  const completeness = brandProfile
+    ? assessBrandCompleteness(brandProfile).score
+    : null;
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow={sectionFor("ad-factory/launch/builder")}
         title="Launch ads"
-        description="One campaign, one ad set, as many ads as you add. Everything is created in Meta in a single pass — paused unless you say otherwise."
+        description="Creatives, ad copy and a campaign, created in your Meta ad account in one pass — always paused, so nothing spends until you switch it on in Ads Manager."
       />
 
       {usable.length === 0 && (
@@ -82,6 +96,26 @@ export default async function LaunchBuilderPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      <StoreSummary
+        brandName={brandProfile?.brand_name ?? null}
+        sells={brandProfile?.product_positioning ?? null}
+        audience={brandProfile?.target_audience ?? null}
+        tone={brandProfile?.tone_attributes ?? []}
+        offer={brandProfile?.brand_mission ?? null}
+        completeness={completeness}
+        productCount={
+          assets.filter(
+            (asset) => asset.asset_type === "product" && asset.is_active,
+          ).length
+        }
+        hasOwnerPhoto={assets.some(
+          (asset) => asset.asset_type === "owner" && asset.is_active,
+        )}
+        hasLogo={assets.some(
+          (asset) => asset.asset_type === "logo" && asset.is_active,
+        )}
+      />
 
       <LaunchBuilder
         accounts={usable.map((account) => ({
