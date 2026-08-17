@@ -141,6 +141,7 @@ export function ConceptPicker({
             onClick={() => {
               onAdd(
                 chosen.map((concept) => ({
+                  id: crypto.randomUUID(),
                   url: concept.imageUrl,
                   // Each concept was written for its own picture, so its words
                   // travel with it rather than being flattened into one block.

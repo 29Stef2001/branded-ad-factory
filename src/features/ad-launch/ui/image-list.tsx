@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Images,
   Pencil,
+  Plus,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -16,6 +17,12 @@ import { mediaKindFor } from "@/features/ad-launch/domain/media";
 import { uploadLaunchMediaAction } from "@/features/ad-launch/application/launch-batch";
 
 export type ImageEntry = {
+  /**
+   * Stable across edits, so a row keeps its identity while its URL is being
+   * typed. Keying on the URL meant two empty rows collided and React reused
+   * one of them for the other.
+   */
+  id: string;
   url: string;
   /**
    * Copy for this one ad, when it should differ from the shared block.
@@ -62,6 +69,7 @@ export function ImageList({
       ...urls
         .filter((url) => !known.has(url))
         .map((url) => ({
+          id: crypto.randomUUID(),
           url,
           overrideHeadline: null,
           overridePrimaryText: null,
@@ -164,18 +172,46 @@ export function ImageList({
         </div>
       </div>
 
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="self-start"
+        onClick={() =>
+          onChange([
+            ...images,
+            // Empty rather than a copy of the last one: a blank row is
+            // obviously unfinished, while a duplicate quietly launches the
+            // same creative twice.
+            {
+              id: crypto.randomUUID(),
+              url: "",
+              overrideHeadline: null,
+              overridePrimaryText: null,
+            },
+          ])
+        }
+      >
+        <Plus aria-hidden className="size-3.5" />
+        Add ad
+      </Button>
+
       {images.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {images.map((image, index) => (
             <div
-              key={image.url}
+              key={image.id}
               className="flex flex-col gap-2 rounded-md border border-border p-2 text-sm"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-6 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
-                {mediaKindFor(image.url) === "video" ? (
+                {!image.url ? (
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded bg-muted/40 text-[10px] text-muted-foreground">
+                    empty
+                  </div>
+                ) : mediaKindFor(image.url) === "video" ? (
                   <video
                     src={image.url}
                     muted
@@ -189,16 +225,33 @@ export function ImageList({
                     className="size-12 shrink-0 rounded object-cover ring-1 ring-foreground/10"
                   />
                 )}
-                <span className="min-w-40 flex-1 truncate font-mono text-xs text-muted-foreground">
-                  {image.url}
-                  {mediaKindFor(image.url) === "unknown" && (
-                    // Meta needs to know before uploading: videos and images go
-                    // to different endpoints entirely.
-                    <span className="ml-2 text-warning">
-                      unrecognised file type — will be uploaded as an image
-                    </span>
-                  )}
-                </span>
+                {image.url ? (
+                  <span className="min-w-40 flex-1 truncate font-mono text-xs text-muted-foreground">
+                    {image.url}
+                    {mediaKindFor(image.url) === "unknown" && (
+                      // Meta needs to know before uploading: videos and images go
+                      // to different endpoints entirely.
+                      <span className="ml-2 text-warning">
+                        unrecognised file type — will be uploaded as an image
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <Input
+                    value={image.url}
+                    onChange={(event) =>
+                      onChange(
+                        images.map((entry, position) =>
+                          position === index
+                            ? { ...entry, url: event.target.value }
+                            : entry,
+                        ),
+                      )
+                    }
+                    placeholder="https://… image or video URL"
+                    className="min-w-40 flex-1 font-mono text-xs"
+                  />
+                )}
                 <div className="flex items-center gap-1">
                   <Button
                     type="button"
@@ -229,7 +282,7 @@ export function ImageList({
                         : "ghost"
                     }
                     onClick={() =>
-                      setEditing(editing === image.url ? null : image.url)
+                      setEditing(editing === image.id ? null : image.id)
                     }
                     aria-label="Different copy for this ad"
                     title="Different copy for this ad"
@@ -252,7 +305,7 @@ export function ImageList({
                 </div>
               </div>
 
-              {editing === image.url && (
+              {editing === image.id && (
                 <div className="flex flex-col gap-2 border-t border-border pt-2">
                   <p className="text-xs text-muted-foreground">
                     Leave blank to use the shared copy. Only fill these in when

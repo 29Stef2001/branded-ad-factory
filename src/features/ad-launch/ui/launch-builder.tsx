@@ -226,21 +226,30 @@ export function LaunchBuilder({
         existingCampaignHasBudget:
           campaigns.find((campaign) => campaign.id === campaignId)?.hasBudget ??
           false,
-        // One ad per image, sharing the copy above unless that ad overrides it.
-        ads: images.map((image) => ({
-          primaryText: image.overridePrimaryText ?? primaryText,
-          headline: image.overrideHeadline ?? headline,
-          description,
-          callToAction,
-          linkUrl,
-          imageUrl: image.url,
-        })),
+        // One ad per creative, sharing the copy above unless that ad overrides
+        // it. Rows with no file yet are left out rather than failing the whole
+        // batch — an unfinished row is a row someone is still working on.
+        ads: images
+          .filter((image) => image.url.trim().length > 0)
+          .map((image) => ({
+            primaryText: image.overridePrimaryText ?? primaryText,
+            headline: image.overrideHeadline ?? headline,
+            description,
+            callToAction,
+            linkUrl,
+            imageUrl: image.url,
+          })),
         adStatus,
         dryRun,
       });
       setResult(outcome);
     });
   };
+
+  // Only rows with a file are launchable; the rest are still being filled in.
+  const readyCount = images.filter(
+    (image) => image.url.trim().length > 0,
+  ).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -697,7 +706,7 @@ export function LaunchBuilder({
             <Rocket aria-hidden className="size-3.5" />
             {pending
               ? "Launching…"
-              : `Schedule ${images.length} ad${images.length === 1 ? "" : "s"} in Meta (as PAUSED)`}
+              : `Schedule ${readyCount} ad${readyCount === 1 ? "" : "s"} in Meta (as PAUSED)`}
           </Button>
         </div>
 
