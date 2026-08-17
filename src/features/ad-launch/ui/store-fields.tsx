@@ -17,6 +17,20 @@ import {
 import { initialActionState } from "@/features/ad-concepts/application/types";
 
 /**
+ * Small uppercase labels, matching the rest of this page's mastheads.
+ *
+ * A shared component rather than the class list repeated on eight fields: one
+ * of them drifting is how a form starts looking hand-assembled.
+ */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">
+      {children}
+    </span>
+  );
+}
+
+/**
  * The store fields, editable here as well as in Brand Profile.
  *
  * Both write the same row. Editing in two places is a convenience; storing in
@@ -68,7 +82,7 @@ export function StoreFields({
     <>
       <DarkPanel
         title="0 · My store"
-        description="What every creative is written for. The same fields as Brand Profile, saved to the same place — edit them wherever you happen to be."
+        description="New creatives are written for your store, its story and its products. Fetch the store once."
         actions={
           <Link
             href="/dashboard/brand-profile"
@@ -89,8 +103,8 @@ export function StoreFields({
           </Alert>
         )}
 
-        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
-          <span className="text-xs font-medium">Store URL</span>
+        <div className="flex flex-col gap-1">
+          <FieldLabel>Store URL</FieldLabel>
           <div className="flex flex-wrap items-center gap-2">
             <Input
               value={storeUrl}
@@ -136,7 +150,7 @@ export function StoreFields({
         <form action={action} className="flex flex-col gap-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Store name</span>
+              <FieldLabel>Store name</FieldLabel>
               <Input
                 name="brandName"
                 key={fetched?.storeName ?? "name"}
@@ -144,7 +158,7 @@ export function StoreFields({
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Sells</span>
+              <FieldLabel>Sells</FieldLabel>
               <Input
                 name="sells"
                 key={fetched?.sells ?? "sells"}
@@ -155,13 +169,13 @@ export function StoreFields({
           </div>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Story / positioning</span>
-            <Textarea name="story" rows={3} defaultValue={story} />
+            <FieldLabel>Story / positioning</FieldLabel>
+            <Textarea name="story" rows={4} defaultValue={story} />
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Offer / promo</span>
+              <FieldLabel>Offer / promo</FieldLabel>
               <Input
                 name="offer"
                 defaultValue={offer}
@@ -169,7 +183,7 @@ export function StoreFields({
               />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Audience</span>
+              <FieldLabel>Audience</FieldLabel>
               <Input
                 name="audience"
                 defaultValue={audience}
@@ -179,7 +193,7 @@ export function StoreFields({
           </div>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Tone</span>
+            <FieldLabel>Tone</FieldLabel>
             <Input
               name="toneAttributes"
               defaultValue={tone}
@@ -217,46 +231,42 @@ export function StoreFields({
 
       <DarkPanel
         title="0b · Products"
-        description="Real product photos, so creatives show what you actually sell rather than something invented."
+        description="Fetch your real products so creatives are made for items you actually sell, not invented ones."
         actions={
-          <Link
-            href="/dashboard/creative-studio/brand-assets"
-            className={buttonVariants({ size: "sm", variant: "outline" })}
-          >
-            <Package aria-hidden className="size-3.5" />
-            Manage products
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || !storeUrl.trim()}
+              onClick={() => {
+                setStoreError(null);
+                setStoreMessage(null);
+                startBusy(async () => {
+                  const result = await importStoreProductsAction(storeUrl);
+                  if (result.error) return setStoreError(result.error);
+                  setStoreMessage(
+                    `Imported ${result.imported} product${result.imported === 1 ? "" : "s"}` +
+                      (result.skipped > 0
+                        ? `, skipped ${result.skipped} already there.`
+                        : "."),
+                  );
+                });
+              }}
+            >
+              <Download aria-hidden className="size-3.5" />
+              {busy ? "Importing…" : "Fetch products"}
+            </Button>
+            <Link
+              href="/dashboard/creative-studio/brand-assets"
+              className={buttonVariants({ size: "sm", variant: "outline" })}
+            >
+              <Package aria-hidden className="size-3.5" />
+              Manage
+            </Link>
+          </div>
         }
         contentClassName="flex flex-col gap-3"
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy || !storeUrl.trim()}
-            onClick={() => {
-              setStoreError(null);
-              setStoreMessage(null);
-              startBusy(async () => {
-                const result = await importStoreProductsAction(storeUrl);
-                if (result.error) return setStoreError(result.error);
-                setStoreMessage(
-                  `Imported ${result.imported} product${result.imported === 1 ? "" : "s"}` +
-                    (result.skipped > 0
-                      ? `, skipped ${result.skipped} already there.`
-                      : "."),
-                );
-              });
-            }}
-          >
-            <Download aria-hidden className="size-3.5" />
-            {busy ? "Importing…" : "Fetch products"}
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            Uses the store URL above.
-          </span>
-        </div>
-
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge
             label={`${productCount} product photo${productCount === 1 ? "" : "s"}`}
