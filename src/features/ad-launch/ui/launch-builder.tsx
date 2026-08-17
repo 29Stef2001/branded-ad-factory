@@ -28,6 +28,15 @@ import {
 
 type Option = { id: string; label: string };
 
+/** Small uppercase field labels, matching blocks 0 and 1. */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">
+      {children}
+    </span>
+  );
+}
+
 /** Meta truncates past these in the feed rather than rejecting the ad. */
 function CharacterCount({ value, limit }: { value: string; limit: number }) {
   const over = value.length > limit;
@@ -241,7 +250,7 @@ export function LaunchBuilder({
         contentClassName="grid gap-3 sm:grid-cols-2"
       >
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Ad account</span>
+          <FieldLabel>Ad account</FieldLabel>
           <select
             value={adAccountId}
             onChange={(event) => changeAccount(event.target.value)}
@@ -257,7 +266,7 @@ export function LaunchBuilder({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Facebook Page</span>
+          <FieldLabel>Facebook Page</FieldLabel>
           <select
             value={pageId}
             onChange={(event) => setPageId(event.target.value)}
@@ -313,7 +322,7 @@ export function LaunchBuilder({
 
         {mode === "new-adset" && (
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Campaign</span>
+            <FieldLabel>Campaign</FieldLabel>
             <select
               value={campaignId}
               onChange={(event) => setCampaignId(event.target.value)}
@@ -343,7 +352,7 @@ export function LaunchBuilder({
         {mode === "existing" ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Campaign</span>
+              <FieldLabel>Campaign</FieldLabel>
               <select
                 value={campaignId}
                 onChange={(event) => changeCampaign(event.target.value)}
@@ -363,7 +372,7 @@ export function LaunchBuilder({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Ad set</span>
+              <FieldLabel>Ad set</FieldLabel>
               <select
                 value={existingAdSetId}
                 onChange={(event) => changeAdSet(event.target.value)}
@@ -398,17 +407,54 @@ export function LaunchBuilder({
           <div className="grid gap-3 sm:grid-cols-2">
             {/* The campaign's own fields are only asked for when one is being
                 created; an existing campaign already has them. */}
-            <label className="flex flex-col gap-1 sm:col-span-2">
-              <span className="text-xs font-medium">Campaign name</span>
+            <label className="flex flex-col gap-1">
+              <FieldLabel>Campaign name</FieldLabel>
               <Input
                 value={campaignName}
                 onChange={(event) => setCampaignName(event.target.value)}
-                placeholder="Final stock — cuffs — GB"
+                placeholder="e.g. Gadget X — prospecting"
               />
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Objective</span>
+              <FieldLabel>Daily budget</FieldLabel>
+              <Input
+                value={dailyBudget}
+                onChange={(event) => setDailyBudget(event.target.value)}
+                placeholder="20"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <FieldLabel>Countries</FieldLabel>
+              <Input
+                value={countries}
+                onChange={(event) => setCountries(event.target.value)}
+                placeholder="GB, US"
+              />
+            </label>
+
+            <div className="flex items-end gap-2">
+              <label className="flex flex-1 flex-col gap-1">
+                <FieldLabel>Age from</FieldLabel>
+                <Input
+                  type="number"
+                  value={ageMin}
+                  onChange={(event) => setAgeMin(Number(event.target.value))}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1">
+                <FieldLabel>to</FieldLabel>
+                <Input
+                  type="number"
+                  value={ageMax}
+                  onChange={(event) => setAgeMax(Number(event.target.value))}
+                />
+              </label>
+            </div>
+
+            <label className="flex flex-col gap-1">
+              <FieldLabel>Objective</FieldLabel>
               <select
                 value={objective}
                 onChange={(event) =>
@@ -425,44 +471,7 @@ export function LaunchBuilder({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Daily budget</span>
-              <Input
-                value={dailyBudget}
-                onChange={(event) => setDailyBudget(event.target.value)}
-                placeholder="20"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Countries</span>
-              <Input
-                value={countries}
-                onChange={(event) => setCountries(event.target.value)}
-                placeholder="GB, US"
-              />
-            </label>
-
-            <div className="flex items-end gap-2">
-              <label className="flex flex-1 flex-col gap-1">
-                <span className="text-xs font-medium">Age from</span>
-                <Input
-                  type="number"
-                  value={ageMin}
-                  onChange={(event) => setAgeMin(Number(event.target.value))}
-                />
-              </label>
-              <label className="flex flex-1 flex-col gap-1">
-                <span className="text-xs font-medium">to</span>
-                <Input
-                  type="number"
-                  value={ageMax}
-                  onChange={(event) => setAgeMax(Number(event.target.value))}
-                />
-              </label>
-            </div>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium">Start time</span>
+              <FieldLabel>Start time</FieldLabel>
               <Input
                 type="datetime-local"
                 value={startTime}
@@ -476,7 +485,7 @@ export function LaunchBuilder({
             {requiresPixel(objective) && (
               <>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium">Pixel</span>
+                  <FieldLabel>Pixel</FieldLabel>
                   <select
                     value={pixelId}
                     onChange={(event) => setPixelId(event.target.value)}
@@ -512,7 +521,7 @@ export function LaunchBuilder({
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium">Optimise for</span>
+                  <FieldLabel>Optimise for</FieldLabel>
                   <select
                     value={customEventType}
                     onChange={(event) => setCustomEventType(event.target.value)}
@@ -537,8 +546,8 @@ export function LaunchBuilder({
         contentClassName="flex flex-col gap-3"
       >
         <label className="flex flex-col gap-1">
-          <span className="flex items-baseline justify-between gap-2 text-xs font-medium">
-            Primary text
+          <span className="flex items-baseline justify-between gap-2">
+            <FieldLabel>Primary text</FieldLabel>
             <CharacterCount value={primaryText} limit={125} />
           </span>
           <Textarea
@@ -551,8 +560,8 @@ export function LaunchBuilder({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="flex items-baseline justify-between gap-2 text-xs font-medium">
-              Headline
+            <span className="flex items-baseline justify-between gap-2">
+              <FieldLabel>Headline</FieldLabel>
               <CharacterCount value={headline} limit={40} />
             </span>
             <Input
@@ -562,8 +571,8 @@ export function LaunchBuilder({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="flex items-baseline justify-between gap-2 text-xs font-medium">
-              Description
+            <span className="flex items-baseline justify-between gap-2">
+              <FieldLabel>Description</FieldLabel>
               <CharacterCount value={description} limit={30} />
             </span>
             <Input
@@ -574,7 +583,7 @@ export function LaunchBuilder({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Call to action</span>
+            <FieldLabel>Call to action</FieldLabel>
             <select
               value={callToAction}
               onChange={(event) => setCallToAction(event.target.value)}
@@ -589,7 +598,7 @@ export function LaunchBuilder({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium">Destination URL</span>
+            <FieldLabel>Destination URL</FieldLabel>
             <Input
               type="url"
               value={linkUrl}
@@ -632,7 +641,7 @@ export function LaunchBuilder({
 
       <DarkPanel
         title="6 · Launch"
-        description="A dry run asks Meta to validate everything and create nothing. Worth doing first — it is the only way to find out whether Meta accepts these settings without finding out the expensive way."
+        description="Everything is uploaded and created in Meta as PAUSED. Switch it on in Ads Manager when you are ready — nothing spends until you do."
         contentClassName="flex flex-col gap-3"
       >
         <label className="flex items-start gap-2 text-sm">
@@ -688,7 +697,7 @@ export function LaunchBuilder({
             <Rocket aria-hidden className="size-3.5" />
             {pending
               ? "Launching…"
-              : `Launch ${images.length} ad${images.length === 1 ? "" : "s"}`}
+              : `Schedule ${images.length} ad${images.length === 1 ? "" : "s"} in Meta (as PAUSED)`}
           </Button>
         </div>
 
