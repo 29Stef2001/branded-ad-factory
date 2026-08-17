@@ -708,7 +708,7 @@ export async function finishJobRun(
   db?: Db,
 ): Promise<void> {
   const supabase = await resolve(db);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("job_runs")
     .update({
       status: update.status,
@@ -718,12 +718,45 @@ export async function finishJobRun(
       error: update.error ?? null,
       finished_at: new Date().toISOString(),
     })
-    .eq("id", jobRunId);
+    .eq("id", jobRunId)
+    .select("user_id, job_name")
+    .maybeSingle();
 
   if (error) throw error;
+
+  // A completed pass makes every earlier partial obsolete. Left alone they stay
+  // `partial` for ever, so the next run resumes from a cursor belonging to a
+  // cycle that already finished — re-walking accounts that are up to date while
+  // never reaching the ones that are not. They are closed rather than deleted:
+  // they were real steps in a pass that has now completed.
+  if (update.status === "succeeded" && data) {
+    const { error: closeError } = await supabase
+      .from("job_runs")
+      .update({ status: "succeeded", cursor: null })
+      .eq("user_id", data.user_id)
+      .eq("job_name", data.job_name)
+      .eq("status", "partial")
+      .neq("id", jobRunId);
+
+    if (closeError) throw closeError;
+  }
 }
 
 /** The cursor a partial run left behind, so the next invocation resumes. */
+/**
+ * Where the last unfinished run stopped.
+ *
+ * Filters on `status = 'partial'` in the query rather than taking the newest
+ * row and checking afterwards. The caller has already claimed this run, so a
+ * row with status 'running' exists with a timestamp from the same instant —
+ * and "newest row" would sometimes pick that one, find it is not partial, and
+ * report no cursor. The sync then restarted from the first account.
+ *
+ * That was not a rare race. Four consecutive runs over thirty accounts each
+ * re-synced around 1,500 rows and the cursor wandered 9 → 7 → 8 → 9 instead of
+ * advancing: progress was partly luck, and a large account set might never
+ * have finished.
+ */
 export async function lastCursorFor(
   jobName: string,
   userId?: string,
@@ -731,7 +764,11 @@ export async function lastCursorFor(
 ): Promise<Record<string, unknown> | null> {
   const supabase = await resolve(db);
   const { data, error } = await scopedToUser(
-    supabase.from("job_runs").select("cursor, status").eq("job_name", jobName),
+    supabase
+      .from("job_runs")
+      .select("cursor")
+      .eq("job_name", jobName)
+      .eq("status", "partial"),
     userId,
   )
     .order("started_at", { ascending: false })
@@ -739,8 +776,7 @@ export async function lastCursorFor(
     .maybeSingle();
 
   if (error) throw error;
-  if (!data || data.status !== "partial") return null;
-  return (data.cursor as Record<string, unknown> | null) ?? null;
+  return (data?.cursor as Record<string, unknown> | null) ?? null;
 }
 
 export async function listRecentJobRuns(limit = 10): Promise<JobRunRow[]> {
