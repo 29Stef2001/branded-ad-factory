@@ -29,6 +29,7 @@ import {
 } from "@/features/ad-concepts/infrastructure/ad-concepts-repository";
 import { recordBatch } from "@/features/ad-launch/infrastructure/launch-repository";
 import { isVideo } from "@/features/ad-launch/domain/media";
+import { createClient } from "@/lib/supabase/server";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 
 /**
@@ -622,4 +623,72 @@ export async function listLaunchableConceptsAction(): Promise<{
   } catch (error) {
     return { concepts: [], error: describe(error) };
   }
+}
+
+const LAUNCH_MEDIA_BUCKET = "launch-media";
+
+/**
+ * Stores creatives the user made themselves.
+ *
+ * Uploaded rather than linked because that is where the files are: made in
+ * Photoshop or a video editor and sitting on a laptop, not already on a CDN.
+ * Asking for a URL means uploading them somewhere else first, which is the
+ * step this removes.
+ *
+ * Returns signed URLs, which is what the launcher hands to Meta. The bucket is
+ * private and the path is prefixed with the user id, so ownership is carried
+ * by the path the way it is everywhere else in this app.
+ */
+export async function uploadLaunchMediaAction(
+  formData: FormData,
+): Promise<{ urls: string[]; error: string | null }> {
+  const { userId, denied } = await requireUserId();
+  if (denied) return { urls: [], error: denied.message ?? "Not signed in." };
+
+  const files = formData
+    .getAll("files")
+    .filter((f): f is File => f instanceof File);
+  if (files.length === 0) return { urls: [], error: "No files to upload." };
+
+  const supabase = await createClient();
+  const paths: string[] = [];
+
+  for (const file of files) {
+    // The name is kept so the list stays recognisable, but prefixed with a
+    // timestamp: two files called "creative.png" are otherwise the same object.
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `${userId}/${Date.now()}-${paths.length}-${safeName}`;
+
+    const { error } = await supabase.storage
+      .from(LAUNCH_MEDIA_BUCKET)
+      .upload(path, file, { contentType: file.type, upsert: false });
+
+    if (error) {
+      // Reports what got through rather than discarding it — re-uploading
+      // twenty files because the nineteenth failed is its own problem.
+      return {
+        urls: await signLaunchMedia(paths),
+        error: `${file.name}: ${error.message}`,
+      };
+    }
+    paths.push(path);
+  }
+
+  return { urls: await signLaunchMedia(paths), error: null };
+}
+
+async function signLaunchMedia(paths: string[]): Promise<string[]> {
+  if (paths.length === 0) return [];
+  const supabase = await createClient();
+
+  // Long-lived because the URL is pasted into a form the user may leave open,
+  // and Meta fetches it at launch time rather than now.
+  const { data, error } = await supabase.storage
+    .from(LAUNCH_MEDIA_BUCKET)
+    .createSignedUrls(paths, 60 * 60 * 24 * 7);
+
+  if (error) return [];
+  return (data ?? [])
+    .map((entry) => entry.signedUrl)
+    .filter((url): url is string => Boolean(url));
 }

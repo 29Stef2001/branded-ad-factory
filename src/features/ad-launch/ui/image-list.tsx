@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowDown, ArrowUp, Images, Pencil, Trash2 } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Images,
+  Pencil,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { mediaKindFor } from "@/features/ad-launch/domain/media";
+import { uploadLaunchMediaAction } from "@/features/ad-launch/application/launch-batch";
 
 export type ImageEntry = {
   url: string;
@@ -41,6 +49,25 @@ export function ImageList({
 }) {
   const [pasted, setPasted] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, startUpload] = useTransition();
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const addUrls = (urls: string[]) => {
+    // Duplicates are dropped: the same creative twice in one ad set competes
+    // with itself for delivery.
+    const known = new Set(images.map((image) => image.url));
+    onChange([
+      ...images,
+      ...urls
+        .filter((url) => !known.has(url))
+        .map((url) => ({
+          url,
+          overrideHeadline: null,
+          overridePrimaryText: null,
+        })),
+    ]);
+  };
 
   const parsed = pasted
     .split(/[\n,\s]+/)
@@ -58,7 +85,52 @@ export function ImageList({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
-        <span className="text-sm font-medium">Paste creative URLs</span>
+        <span className="text-sm font-medium">Upload from your computer</span>
+        <p className="text-xs text-muted-foreground">
+          Images or videos. Pick several at once — each becomes its own ad, in
+          the order you selected them.
+        </p>
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          accept="image/*,video/*"
+          className="hidden"
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
+            if (files.length === 0) return;
+
+            setUploadError(null);
+            const body = new FormData();
+            for (const file of files) body.append("files", file);
+
+            startUpload(async () => {
+              const result = await uploadLaunchMediaAction(body);
+              // Whatever got through is added even when a later file failed —
+              // re-uploading twenty because the nineteenth broke is its own
+              // problem.
+              if (result.urls.length > 0) addUrls(result.urls);
+              setUploadError(result.error);
+              if (fileInput.current) fileInput.current.value = "";
+            });
+          }}
+        />
+        <Button
+          type="button"
+          size="sm"
+          disabled={uploading}
+          onClick={() => fileInput.current?.click()}
+        >
+          <Upload aria-hidden className="size-3.5" />
+          {uploading ? "Uploading…" : "Choose files"}
+        </Button>
+        {uploadError && (
+          <span className="text-xs text-destructive">{uploadError}</span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
+        <span className="text-sm font-medium">…or paste creative URLs</span>
         <p className="text-xs text-muted-foreground">
           One per line — images or videos. Each becomes its own ad, in this
           order, sharing the copy above.
@@ -77,19 +149,7 @@ export function ImageList({
             variant="outline"
             disabled={parsed.length === 0}
             onClick={() => {
-              // Duplicates are dropped rather than accepted: the same creative
-              // twice in one ad set competes with itself for delivery.
-              const known = new Set(images.map((image) => image.url));
-              onChange([
-                ...images,
-                ...parsed
-                  .filter((url) => !known.has(url))
-                  .map((url) => ({
-                    url,
-                    overrideHeadline: null,
-                    overridePrimaryText: null,
-                  })),
-              ]);
+              addUrls(parsed);
               setPasted("");
             }}
           >
