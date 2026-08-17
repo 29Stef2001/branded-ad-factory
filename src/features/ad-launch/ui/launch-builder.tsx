@@ -483,11 +483,18 @@ export function LaunchBuilder({
               <FieldLabel>Start time</FieldLabel>
               <Input
                 type="datetime-local"
+                // Browsers render this control in their own locale, which is
+                // why it showed 24-hour time. The lang attribute is the only
+                // hook a page has on that, and en-US is what puts AM/PM on it.
+                // The value sent is unaffected either way — it is always
+                // ISO-like, so what Meta receives does not change.
+                lang="en-US"
                 value={startTime}
                 onChange={(event) => setStartTime(event.target.value)}
               />
               <span className="text-xs text-muted-foreground">
-                Leave empty to start as soon as it is switched on.
+                Leave empty to start as soon as it is switched on. Times are in
+                your own timezone.
               </span>
             </label>
 
