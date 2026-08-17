@@ -16,6 +16,17 @@ import {
 import { generateFromWinnersAction } from "@/features/ad-launch/application/generate-from-winners";
 
 /**
+ * Small uppercase labels, matching the rest of the launch page.
+ */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">
+      {children}
+    </span>
+  );
+}
+
+/**
  * Creatives and copy modelled on ads that already work.
  *
  * Generation runs through the existing concept pipeline — brand context,
@@ -61,7 +72,7 @@ export function GenerateCreatives() {
 
   return (
     <DarkPanel
-      title="1 · Creatives and copy from winning ads"
+      title="1 · Creatives + copy modelled on winning ads"
       description="Modelled on ads that already work, written for your store. Runs through the same QA as everything else, so nothing off-brand reaches an ad account."
       actions={
         <Link
@@ -73,9 +84,9 @@ export function GenerateCreatives() {
       }
       contentClassName="flex flex-col gap-3"
     >
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Number of creatives</span>
+          <FieldLabel>Number of creatives</FieldLabel>
           <select
             value={count}
             onChange={(event) => setCount(Number(event.target.value))}
@@ -90,7 +101,7 @@ export function GenerateCreatives() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Format</span>
+          <FieldLabel>Format</FieldLabel>
           <select
             value={format}
             onChange={(event) => setFormat(event.target.value)}
@@ -103,9 +114,11 @@ export function GenerateCreatives() {
             ))}
           </select>
         </label>
+      </div>
 
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">Resolution</span>
+          <FieldLabel>Resolution</FieldLabel>
           <select
             value={resolution}
             onChange={(event) => setResolution(event.target.value)}
@@ -120,15 +133,22 @@ export function GenerateCreatives() {
         </label>
       </div>
 
+      {/* Says which model actually runs, because the setting above promises a
+          resolution and the model is what has to deliver it. */}
+      <p className="text-xs text-muted-foreground">
+        Images: OpenAI gpt-image-2 at 1024px. Larger sizes and other models are
+        a one-line change once a plan allows them.
+      </p>
+
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">
-          Ad Library links — competitors in other niches with strong creative
-        </span>
+        <FieldLabel>
+          Ad Library links (competitors or other niches with strong creative)
+        </FieldLabel>
         <Textarea
           rows={3}
           value={links}
           onChange={(event) => setLinks(event.target.value)}
-          placeholder="https://www.facebook.com/ads/library/?id=…  (one per line)"
+          placeholder="Paste Ad Library links, one per line. Your new creatives are modelled on them — original, and written for your store."
           className="font-mono text-[13px]"
         />
         <span className="text-xs text-muted-foreground">
@@ -148,29 +168,31 @@ export function GenerateCreatives() {
         {running ? "Generating…" : "Scan links and generate for my store"}
       </Button>
 
-      <div className="border-t border-border pt-3">
+      <p className="text-sm text-muted-foreground">
+        …or paste the text of winning ads yourself:
+      </p>
+
+      <div>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium">
-            …or paste the text of winning ads
-          </span>
+          <FieldLabel>Winning ads (text) — paste one or more</FieldLabel>
           <Textarea
             rows={4}
             value={winningText}
             onChange={(event) => setWinningText(event.target.value)}
-            placeholder="Paste one or more ads. They are modelled on, not copied — the wording written will be your own."
+            placeholder="Paste the text of winning ads. The generator models the new creatives and copy on these, but writes original wording."
           />
         </label>
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium">
-          Product brief — optional, your store profile is used when empty
-        </span>
+        <FieldLabel>
+          Product brief (empty = your store profile is used automatically)
+        </FieldLabel>
         <Textarea
           rows={2}
           value={brief}
           onChange={(event) => setBrief(event.target.value)}
-          placeholder="Extra product details or the offer to lead with…"
+          placeholder="Optional: extra product details and the offer to lead with…"
         />
       </label>
 
