@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { sectionFor } from "@/components/shell/nav-config";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LaunchBuilder } from "@/features/ad-launch/ui/launch-builder";
-import { StoreSummary } from "@/features/ad-launch/ui/store-summary";
+import { StoreFields } from "@/features/ad-launch/ui/store-fields";
 import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
 import { listPixels } from "@/features/ad-launch/infrastructure/meta-launch-client";
 import {
@@ -97,12 +97,14 @@ export default async function LaunchBuilderPage() {
         </Alert>
       )}
 
-      <StoreSummary
-        brandName={brandProfile?.brand_name ?? null}
-        sells={brandProfile?.product_positioning ?? null}
-        audience={brandProfile?.target_audience ?? null}
-        tone={brandProfile?.tone_attributes ?? []}
-        offer={brandProfile?.brand_mission ?? null}
+      <StoreFields
+        hasProfile={brandProfile !== null}
+        brandName={brandProfile?.brand_name ?? ""}
+        sells={brandProfile?.product_positioning ?? ""}
+        story={brandProfile?.brand_story ?? ""}
+        offer={brandProfile?.brand_mission ?? ""}
+        audience={brandProfile?.target_audience ?? ""}
+        tone={(brandProfile?.tone_attributes ?? []).join(", ")}
         completeness={completeness}
         productCount={
           assets.filter(
