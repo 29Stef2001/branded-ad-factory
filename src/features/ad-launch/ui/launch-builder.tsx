@@ -39,16 +39,29 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 /** Meta truncates past these in the feed rather than rejecting the ad. */
-function CharacterCount({ value, limit }: { value: string; limit: number }) {
-  const over = value.length > limit;
+/**
+ * How long the text is, and where the feed folds it.
+ *
+ * Not a limit and not a warning. Meta accepts far more than these numbers —
+ * they are the point at which the feed collapses the rest behind "See more",
+ * which is a layout fact, not a rejection. Colouring it as a problem made a
+ * perfectly good long-form ad look broken, and long copy is a deliberate
+ * choice for some of these stores rather than a mistake.
+ */
+function CharacterCount({
+  value,
+  foldsAt,
+}: {
+  value: string;
+  foldsAt: number;
+}) {
+  const folds = value.length > foldsAt;
   return (
-    <span
-      className={
-        over ? "text-xs text-warning" : "text-xs text-muted-foreground/70"
-      }
-    >
-      {value.length}/{limit}
-      {over ? " — will be truncated" : ""}
+    <span className="text-xs text-muted-foreground/70">
+      {value.length}
+      {folds
+        ? ` — feed shows the first ~${foldsAt}, rest behind “See more”`
+        : ""}
     </span>
   );
 }
@@ -555,7 +568,7 @@ export function LaunchBuilder({
         <label className="flex flex-col gap-1">
           <span className="flex items-baseline justify-between gap-2">
             <FieldLabel>Primary text</FieldLabel>
-            <CharacterCount value={primaryText} limit={125} />
+            <CharacterCount value={primaryText} foldsAt={125} />
           </span>
           <Textarea
             rows={3}
@@ -569,7 +582,7 @@ export function LaunchBuilder({
           <label className="flex flex-col gap-1">
             <span className="flex items-baseline justify-between gap-2">
               <FieldLabel>Headline</FieldLabel>
-              <CharacterCount value={headline} limit={40} />
+              <CharacterCount value={headline} foldsAt={40} />
             </span>
             <Input
               value={headline}
@@ -580,7 +593,7 @@ export function LaunchBuilder({
           <label className="flex flex-col gap-1">
             <span className="flex items-baseline justify-between gap-2">
               <FieldLabel>Description</FieldLabel>
-              <CharacterCount value={description} limit={30} />
+              <CharacterCount value={description} foldsAt={30} />
             </span>
             <Input
               value={description}
