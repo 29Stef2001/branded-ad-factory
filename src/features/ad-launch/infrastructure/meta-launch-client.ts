@@ -531,6 +531,35 @@ async function waitForVideo(
   }
 }
 
+/**
+ * Meta's automatic "enhancements", each switched off by name.
+ *
+ * They rewrite copy, re-crop images, replace backgrounds and swap the call to
+ * action. This app spends a whole QA pass proving a creative is on brand and
+ * the wording is exactly what was approved, so letting Meta alter it
+ * afterwards would throw that away.
+ *
+ * Listed individually because the single `standard_enhancements` switch is
+ * deprecated — Meta now rejects a creative that uses it, which is how this was
+ * found. Every name here was checked against the live API, and a deliberately
+ * invented one is rejected, so the list means something rather than being
+ * silently ignored.
+ */
+const OPT_OUT_OF_ENHANCEMENTS = Object.fromEntries(
+  [
+    "image_touchups",
+    "text_generation",
+    "image_background_gen",
+    "enhance_cta",
+    "text_optimizations",
+    "image_brightness_and_contrast",
+    "video_auto_crop",
+    "image_templates",
+    "adapt_to_placement",
+    "media_type_automation",
+  ].map((feature) => [feature, { enroll_status: "OPT_OUT" }]),
+);
+
 export type CreativeInput = {
   name: string;
   pageId: string;
@@ -601,13 +630,7 @@ export async function createAdCreative(
       name: input.name,
       object_story_spec: JSON.stringify(storySpec),
       degrees_of_freedom_spec: JSON.stringify({
-        // Meta's automatic "enhancements" rewrite copy and crop images. This
-        // app spends a QA pass proving the creative is on brand and the text
-        // is exactly the approved wording, so letting Meta alter it afterwards
-        // would throw that away.
-        creative_features_spec: {
-          standard_enhancements: { enroll_status: "OPT_OUT" },
-        },
+        creative_features_spec: OPT_OUT_OF_ENHANCEMENTS,
       }),
     },
     accessToken,
