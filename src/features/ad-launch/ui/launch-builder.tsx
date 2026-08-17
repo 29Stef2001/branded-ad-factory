@@ -9,6 +9,7 @@ import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
 import { ImageList, type ImageEntry } from "@/features/ad-launch/ui/image-list";
 import { ConceptPicker } from "@/features/ad-launch/ui/concept-picker";
+import { StartTimePicker } from "@/features/ad-launch/ui/start-time-picker";
 import { CALL_TO_ACTIONS } from "@/features/ad-launch/domain/campaign-settings";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -481,17 +482,7 @@ export function LaunchBuilder({
 
             <label className="flex flex-col gap-1">
               <FieldLabel>Start time</FieldLabel>
-              <Input
-                type="datetime-local"
-                // Browsers render this control in their own locale, which is
-                // why it showed 24-hour time. The lang attribute is the only
-                // hook a page has on that, and en-US is what puts AM/PM on it.
-                // The value sent is unaffected either way — it is always
-                // ISO-like, so what Meta receives does not change.
-                lang="en-US"
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-              />
+              <StartTimePicker value={startTime} onChange={setStartTime} />
               <span className="text-xs text-muted-foreground">
                 Leave empty to start as soon as it is switched on. Times are in
                 your own timezone.
