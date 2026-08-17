@@ -1,15 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
-import { Package, Save, Store } from "lucide-react";
+import { Download, Package, Save, Store } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DarkPanel } from "@/components/layout/dark-panel";
 import { StatusBadge } from "@/components/data/status-badge";
-import { saveStoreFieldsAction } from "@/features/ad-launch/application/save-store-fields";
+import {
+  fetchStoreAction,
+  importStoreProductsAction,
+  saveStoreFieldsAction,
+} from "@/features/ad-launch/application/save-store-fields";
 import { initialActionState } from "@/features/ad-concepts/application/types";
 
 /**
@@ -51,6 +55,15 @@ export function StoreFields({
     initialActionState,
   );
 
+  const [storeUrl, setStoreUrl] = useState("");
+  const [fetched, setFetched] = useState<{
+    storeName: string;
+    sells: string;
+  } | null>(null);
+  const [storeMessage, setStoreMessage] = useState<string | null>(null);
+  const [storeError, setStoreError] = useState<string | null>(null);
+  const [busy, startBusy] = useTransition();
+
   return (
     <>
       <DarkPanel
@@ -76,17 +89,66 @@ export function StoreFields({
           </Alert>
         )}
 
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
+          <span className="text-xs font-medium">Store URL</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={storeUrl}
+              onChange={(event) => setStoreUrl(event.target.value)}
+              placeholder="https://your-store.com"
+              className="min-w-56 flex-1"
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || !storeUrl.trim()}
+              onClick={() => {
+                setStoreError(null);
+                setStoreMessage(null);
+                startBusy(async () => {
+                  const result = await fetchStoreAction(storeUrl);
+                  if (result.error) return setStoreError(result.error);
+                  // Filled in rather than saved: the user should see what was
+                  // found and correct it before every creative is written
+                  // against it.
+                  setFetched({
+                    storeName: result.storeName ?? "",
+                    sells: result.sells ?? "",
+                  });
+                  setStoreMessage(
+                    `Read the store — ${result.productCount} products listed. Check the fields below, then save.`,
+                  );
+                });
+              }}
+            >
+              <Download aria-hidden className="size-3.5" />
+              {busy ? "Reading…" : "Fetch store"}
+            </Button>
+          </div>
+          {storeMessage && (
+            <span className="text-xs text-success">{storeMessage}</span>
+          )}
+          {storeError && (
+            <span className="text-xs text-destructive">{storeError}</span>
+          )}
+        </div>
+
         <form action={action} className="flex flex-col gap-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium">Store name</span>
-              <Input name="brandName" defaultValue={brandName} />
+              <Input
+                name="brandName"
+                key={fetched?.storeName ?? "name"}
+                defaultValue={fetched?.storeName || brandName}
+              />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium">Sells</span>
               <Input
                 name="sells"
-                defaultValue={sells}
+                key={fetched?.sells ?? "sells"}
+                defaultValue={fetched?.sells || sells}
                 placeholder="Handcrafted copper jewellery"
               />
             </label>
@@ -165,20 +227,50 @@ export function StoreFields({
             Manage products
           </Link>
         }
-        contentClassName="flex flex-wrap items-center gap-2"
+        contentClassName="flex flex-col gap-3"
       >
-        <StatusBadge
-          label={`${productCount} product photo${productCount === 1 ? "" : "s"}`}
-          tone={productCount > 0 ? "success" : "warning"}
-        />
-        <StatusBadge
-          label={hasOwnerPhoto ? "Owner photo" : "No owner photo"}
-          tone={hasOwnerPhoto ? "success" : "muted"}
-        />
-        <StatusBadge
-          label={hasLogo ? "Logo" : "No logo"}
-          tone={hasLogo ? "success" : "muted"}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy || !storeUrl.trim()}
+            onClick={() => {
+              setStoreError(null);
+              setStoreMessage(null);
+              startBusy(async () => {
+                const result = await importStoreProductsAction(storeUrl);
+                if (result.error) return setStoreError(result.error);
+                setStoreMessage(
+                  `Imported ${result.imported} product${result.imported === 1 ? "" : "s"}` +
+                    (result.skipped > 0
+                      ? `, skipped ${result.skipped} already there.`
+                      : "."),
+                );
+              });
+            }}
+          >
+            <Download aria-hidden className="size-3.5" />
+            {busy ? "Importing…" : "Fetch products"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Uses the store URL above.
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge
+            label={`${productCount} product photo${productCount === 1 ? "" : "s"}`}
+            tone={productCount > 0 ? "success" : "warning"}
+          />
+          <StatusBadge
+            label={hasOwnerPhoto ? "Owner photo" : "No owner photo"}
+            tone={hasOwnerPhoto ? "success" : "muted"}
+          />
+          <StatusBadge
+            label={hasLogo ? "Logo" : "No logo"}
+            tone={hasLogo ? "success" : "muted"}
+          />
+        </div>
       </DarkPanel>
     </>
   );
