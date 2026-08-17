@@ -236,7 +236,7 @@ export function LaunchBuilder({
   return (
     <div className="flex flex-col gap-6">
       <DarkPanel
-        title="1 · Where it goes"
+        title="2 · Where it goes"
         description="The account and Page every ad in this batch is created on."
         contentClassName="grid gap-3 sm:grid-cols-2"
       >
@@ -274,7 +274,7 @@ export function LaunchBuilder({
       </DarkPanel>
 
       <DarkPanel
-        title="2 · Campaign and ad set"
+        title="3 · Campaign and ad set"
         description={
           mode === "existing"
             ? "Add these ads to an ad set that already runs. Its targeting, budget, schedule and pixel stay exactly as they are."
@@ -532,7 +532,7 @@ export function LaunchBuilder({
       </DarkPanel>
 
       <DarkPanel
-        title="3 · Ad copy"
+        title="4 · Ad copy"
         description="Shared by every ad in this batch. Only the image differs, which is how these ad sets are actually built."
         contentClassName="flex flex-col gap-3"
       >
@@ -601,7 +601,7 @@ export function LaunchBuilder({
       </DarkPanel>
 
       <DarkPanel
-        title={`4 · Creatives (${images.length})`}
+        title={`5 · Creatives (${images.length})`}
         description="One ad per creative, in this order. Images and videos both."
         contentClassName="flex flex-col gap-3"
       >
@@ -631,7 +631,7 @@ export function LaunchBuilder({
       </DarkPanel>
 
       <DarkPanel
-        title="5 · Launch"
+        title="6 · Launch"
         description="A dry run asks Meta to validate everything and create nothing. Worth doing first — it is the only way to find out whether Meta accepts these settings without finding out the expensive way."
         contentClassName="flex flex-col gap-3"
       >

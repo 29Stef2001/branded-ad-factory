@@ -4,6 +4,7 @@ import { sectionFor } from "@/components/shell/nav-config";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LaunchBuilder } from "@/features/ad-launch/ui/launch-builder";
 import { StoreFields } from "@/features/ad-launch/ui/store-fields";
+import { GenerateCreatives } from "@/features/ad-launch/ui/generate-creatives";
 import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
 import { listPixels } from "@/features/ad-launch/infrastructure/meta-launch-client";
 import {
@@ -118,6 +119,8 @@ export default async function LaunchBuilderPage() {
           (asset) => asset.asset_type === "logo" && asset.is_active,
         )}
       />
+
+      <GenerateCreatives />
 
       <LaunchBuilder
         accounts={usable.map((account) => ({
