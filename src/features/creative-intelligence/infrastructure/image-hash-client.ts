@@ -1,9 +1,42 @@
-import sharp from "sharp";
 import {
   HASH_HEIGHT,
   HASH_WIDTH,
   dHashFromGreyscale,
 } from "@/features/creative-intelligence/domain/perceptual-hash";
+
+type Sharp = typeof import("sharp").default;
+
+/** Unset = not tried yet, null = tried and unavailable. */
+let sharpModule: Sharp | null | undefined;
+
+/**
+ * sharp, loaded on first use rather than at import.
+ *
+ * Both functions below already treat a missing hash as a non-event. A static
+ * `import sharp from "sharp"` quietly broke that promise, because the failure
+ * it needs to survive happens at module load, where no catch block reaches: the
+ * nightly sync imports this file, sharp's linux-x64 binary was missing from the
+ * deployment, and the whole cron answered 500 before a line of the handler ran.
+ * Nothing was ingested for as long as that lasted — over a fingerprint that is
+ * only ever a fallback for attribution.
+ *
+ * The outcome is remembered, failure included. A native module that cannot be
+ * loaded cannot be loaded on the second try either, and retrying per image
+ * would turn one bad deployment into thousands of identical stack traces.
+ */
+async function loadSharp(): Promise<Sharp | null> {
+  if (sharpModule !== undefined) return sharpModule;
+  try {
+    sharpModule = (await import("sharp")).default;
+  } catch (error) {
+    console.warn(
+      "sharp is unavailable — perceptual hashing is disabled for this process",
+      error,
+    );
+    sharpModule = null;
+  }
+  return sharpModule;
+}
 
 /**
  * Decodes an image far enough to fingerprint it.
@@ -20,6 +53,9 @@ import {
 export async function perceptualHashFromImage(
   image: Buffer,
 ): Promise<string | null> {
+  const sharp = await loadSharp();
+  if (!sharp) return null;
+
   try {
     const { data } = await sharp(image)
       // Alpha flattened against white: a transparent PNG would otherwise hash

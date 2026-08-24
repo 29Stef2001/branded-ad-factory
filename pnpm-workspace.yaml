@@ -1,3 +1,19 @@
+# sharp ships its native code as per-platform optional packages, and pnpm
+# installs only the ones matching the machine doing the install. Every install
+# here happens on a Mac, so the lockfile carried darwin-arm64 alone and the
+# linux-x64 build on Vercel had nothing to dlopen: the nightly sync answered
+# 500 before its handler ran, and no performance data was ingested at all.
+#
+# Naming both platforms puts both sets of binaries in the lockfile, so what is
+# resolved on a laptop is what is installed in the deployment.
+supportedArchitectures:
+  os:
+    - darwin
+    - linux
+  cpu:
+    - arm64
+    - x64
+
 allowBuilds:
   sharp: true
   unrs-resolver: true
