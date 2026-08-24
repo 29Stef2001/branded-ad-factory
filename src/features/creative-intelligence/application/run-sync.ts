@@ -73,8 +73,15 @@ export type SyncOutcome = {
  * Generous on purpose. Overshooting the ceiling costs the whole pass and its
  * cursor; reserving too much only fetches fewer rows, and the next run resumes
  * from where this one stopped.
+ *
+ * Thirty seconds because twenty was measured to be too few: a pass that scored
+ * 1,267 creatives spent 28.5s past its ingest and finished the invocation at
+ * 53.5 of the available 60. That margin is not a margin. Note that this is a
+ * reserve, not a limit — scoring is not itself interruptible, so a large enough
+ * account can still overshoot. Bounding scoring the way ingestion is bounded is
+ * the real fix, and this constant is what buys time until then.
  */
-const POST_PROCESSING_RESERVE_MS = 20_000;
+const POST_PROCESSING_RESERVE_MS = 30_000;
 
 /** Below this an ingest pass fetches too little to be worth claiming the job. */
 const MIN_INGEST_MS = 5_000;
