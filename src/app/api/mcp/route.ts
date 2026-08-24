@@ -54,10 +54,44 @@ const NOT_CONFIGURED = new Response(
   { status: 503, headers: { "content-type": "application/json" } },
 );
 
+/**
+ * TEMPORARY diagnostic logging for the "No authorization provided" report —
+ * never the token values themselves, only presence/length/match. mcp-handler
+ * throws that exact message for every `verifyToken` failure (missing header,
+ * malformed header, wrong token, or unset env vars alike) — see
+ * node_modules/mcp-handler/dist/index.js's `withMcpAuth`, which always
+ * reports "No authorization provided" once `required: true` and `!authInfo`,
+ * regardless of which of those it actually was. The message itself cannot
+ * distinguish the cases; this log can. Remove once the real cause is found.
+ */
+function logAuthDiagnostics(
+  req: Request,
+  bearerToken: string | undefined,
+): void {
+  const authHeader = req.headers.get("Authorization");
+  const envToken = env.HERMES_MCP_TOKEN;
+  console.log("[mcp-auth-diagnostic]", {
+    authorizationHeaderPresent: authHeader !== null,
+    bearerPrefixPresent: Boolean(bearerToken),
+    tokenLength: bearerToken?.length ?? 0,
+    envTokenPresent: Boolean(envToken),
+    envTokenLength: envToken?.length ?? 0,
+    envUserIdPresent: Boolean(env.HERMES_MCP_USER_ID),
+    comparisonResult:
+      bearerToken && envToken
+        ? bearerToken === envToken
+          ? "match"
+          : "no-match"
+        : "not-compared",
+  });
+}
+
 async function verifyToken(
-  _req: Request,
+  req: Request,
   bearerToken?: string,
 ): Promise<{ token: string; clientId: string; scopes: string[]; extra: Record<string, unknown> } | undefined> {
+  logAuthDiagnostics(req, bearerToken);
+
   if (!bearerToken || !env.HERMES_MCP_TOKEN || !env.HERMES_MCP_USER_ID) {
     return undefined;
   }

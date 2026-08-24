@@ -28,6 +28,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // api/mcp is bearer-token-authenticated (see src/app/api/mcp/route.ts),
+    // never cookie/session-based — running Supabase's session refresh on
+    // every Hermes tool call is both wasted work and, per its own
+    // NextResponse.next({ request }) reconstruction, an unnecessary extra
+    // hop the Authorization header has no reason to pass through.
+    "/((?!_next/static|_next/image|favicon.ico|api/mcp|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
