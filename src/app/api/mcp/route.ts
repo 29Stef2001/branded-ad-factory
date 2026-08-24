@@ -54,58 +54,66 @@ const NOT_CONFIGURED = new Response(
   { status: 503, headers: { "content-type": "application/json" } },
 );
 
+type AuthCheck =
+  { ok: true; token: string; userId: string } | { ok: false; reason: string };
+
 /**
- * TEMPORARY diagnostic logging for the "No authorization provided" report —
- * never the token values themselves, only presence/length/match. mcp-handler
- * throws that exact message for every `verifyToken` failure (missing header,
- * malformed header, wrong token, or unset env vars alike) — see
- * node_modules/mcp-handler/dist/index.js's `withMcpAuth`, which always
- * reports "No authorization provided" once `required: true` and `!authInfo`,
- * regardless of which of those it actually was. The message itself cannot
- * distinguish the cases; this log can. Remove once the real cause is found.
+ * Whether this request may proceed, and if not, why — in words, for the log.
+ *
+ * mcp-handler answers every `verifyToken` failure with the same sentence — "No
+ * authorization provided" — whether the header was missing, the token was
+ * wrong, or the deployment simply has no `HERMES_MCP_TOKEN` set. See
+ * `withMcpAuth`: once `required: true` and `!authInfo`, that string is the
+ * entire reply, and the four causes are indistinguishable from outside.
+ * Chasing one of them through that message cost an afternoon, so the cause is
+ * named here instead. The name of the cause only — never a token, not even its
+ * length: the caller is told nothing new, and the log is where the answer goes.
  */
-function logAuthDiagnostics(
-  req: Request,
-  bearerToken: string | undefined,
-): void {
-  const authHeader = req.headers.get("Authorization");
-  const envToken = env.HERMES_MCP_TOKEN;
-  console.log("[mcp-auth-diagnostic]", {
-    authorizationHeaderPresent: authHeader !== null,
-    bearerPrefixPresent: Boolean(bearerToken),
-    tokenLength: bearerToken?.length ?? 0,
-    envTokenPresent: Boolean(envToken),
-    envTokenLength: envToken?.length ?? 0,
-    envUserIdPresent: Boolean(env.HERMES_MCP_USER_ID),
-    comparisonResult:
-      bearerToken && envToken
-        ? bearerToken === envToken
-          ? "match"
-          : "no-match"
-        : "not-compared",
-  });
+function checkAuth(bearerToken: string | undefined): AuthCheck {
+  if (!bearerToken)
+    return { ok: false, reason: "no bearer token in the Authorization header" };
+  if (!env.HERMES_MCP_TOKEN)
+    return {
+      ok: false,
+      reason: "HERMES_MCP_TOKEN is not set on this deployment",
+    };
+  if (!env.HERMES_MCP_USER_ID)
+    return {
+      ok: false,
+      reason: "HERMES_MCP_USER_ID is not set on this deployment",
+    };
+  // A plain `!==` rather than a constant-time compare: this is a single-tenant
+  // bearer secret behind a redeploy, not a public OAuth surface.
+  if (bearerToken !== env.HERMES_MCP_TOKEN)
+    return {
+      ok: false,
+      reason: "the bearer token does not match HERMES_MCP_TOKEN",
+    };
+  return { ok: true, token: bearerToken, userId: env.HERMES_MCP_USER_ID };
 }
 
 async function verifyToken(
-  req: Request,
+  _req: Request,
   bearerToken?: string,
-): Promise<{ token: string; clientId: string; scopes: string[]; extra: Record<string, unknown> } | undefined> {
-  logAuthDiagnostics(req, bearerToken);
-
-  if (!bearerToken || !env.HERMES_MCP_TOKEN || !env.HERMES_MCP_USER_ID) {
-    return undefined;
-  }
-  // Fixed-length-independent-ish comparison isn't the point at this scale —
-  // this is a single-tenant bearer secret, not a public OAuth surface — but
-  // a plain `!==` is still the correct, simplest check here.
-  if (bearerToken !== env.HERMES_MCP_TOKEN) {
+): Promise<
+  | {
+      token: string;
+      clientId: string;
+      scopes: string[];
+      extra: Record<string, unknown>;
+    }
+  | undefined
+> {
+  const check = checkAuth(bearerToken);
+  if (!check.ok) {
+    console.warn(`[mcp-auth] refused — ${check.reason}`);
     return undefined;
   }
   return {
-    token: bearerToken,
+    token: check.token,
     clientId: "hermes-agent",
     scopes: ["read:creative-factory"],
-    extra: { userId: env.HERMES_MCP_USER_ID },
+    extra: { userId: check.userId },
   };
 }
 
@@ -115,7 +123,9 @@ function textResult(data: unknown) {
 
 function errorResult(message: string) {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
+    content: [
+      { type: "text" as const, text: JSON.stringify({ error: message }) },
+    ],
     isError: true as const,
   };
 }
@@ -139,7 +149,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await metaGetWinners(input, userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -158,7 +170,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await metaGetCreativeDna(input, userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -176,7 +190,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorList(userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -195,7 +211,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorResearch(input, userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -214,7 +232,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorGetCreativeDna(userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -233,7 +253,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorGetWhitespace(userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -252,7 +274,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await factoryGetStatus(userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -271,7 +295,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await approvalGetStatus(input, userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
@@ -290,7 +316,9 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorDiscover(input, userId, db));
       } catch (error) {
-        return errorResult(error instanceof Error ? error.message : "Unknown error.");
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
       }
     },
   );
