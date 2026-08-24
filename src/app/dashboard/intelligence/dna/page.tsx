@@ -12,6 +12,9 @@ import {
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import { dnaLabel } from "@/features/creative-intelligence/domain/creative-dna";
+import { DnaAccountPicker } from "@/features/creative-intelligence/ui/dna-account-picker";
+import { listSelectedAdAccounts } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
+import { canRunAds } from "@/features/creative-intelligence/domain/account-status";
 
 export const metadata: Metadata = {
   title: "Creative DNA — Branded Ad Factory",
@@ -20,12 +23,44 @@ export const metadata: Metadata = {
 // Ten vision calls in a row is not a fast request.
 export const maxDuration = 300;
 
-export default async function CreativeDnaPage() {
+export default async function CreativeDnaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ accounts?: string }>;
+}) {
+  const { accounts: accountsParam } = await searchParams;
   const user = await getCurrentUser();
+
+  const accounts = (await listSelectedAdAccounts()).filter((row) =>
+    canRunAds(row.account_status),
+  );
+  // Nothing is read until a choice is made: patterns belong to a brand, and
+  // pooling unrelated accounts counts unrelated hooks as one finding.
+  const selected = (accountsParam ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  // Every eligible creative, so each account can show how much there is to
+  // read before it is picked.
+  const allEligible = user
+    ? await listCreativesForDna(
+        user.id,
+        ["confident", "directional"],
+        500,
+        accounts.map((row) => row.ad_account_id),
+      )
+    : [];
+
   const [features, eligible] = await Promise.all([
-    listCreativeFeatures(),
-    user
-      ? listCreativesForDna(user.id, ["confident", "directional"], 200)
+    listCreativeFeatures(selected),
+    user && selected.length > 0
+      ? listCreativesForDna(
+          user.id,
+          ["confident", "directional"],
+          200,
+          selected,
+        )
       : Promise.resolve([]),
   ]);
 
@@ -59,19 +94,41 @@ export default async function CreativeDnaPage() {
           features.length > 0 ? `${features.length} analysed` : undefined
         }
         description="What your best creatives are actually doing — hook, angle, awareness level, composition — recorded in one vocabulary so patterns can be compared across hundreds of ads rather than admired one at a time."
-        actions={<AnalyseDnaButton eligible={remaining} />}
+        actions={
+          <div className="flex flex-wrap items-end gap-3">
+            <DnaAccountPicker
+              accounts={accounts.map((row) => ({
+                id: row.ad_account_id,
+                label: row.name ?? row.ad_account_id,
+                eligible: allEligible.filter(
+                  (creative) => creative.adAccountId === row.ad_account_id,
+                ).length,
+              }))}
+              selected={selected}
+            />
+            <AnalyseDnaButton eligible={remaining} adAccountIds={selected} />
+          </div>
+        }
       />
 
-      {features.length === 0 ? (
+      {selected.length === 0 ? (
+        <EmptyState
+          icon={Microscope}
+          title="Pick one or more ad accounts"
+          description="Patterns belong to a brand. Reading every account together would count a jewellery hook and a headwear hook as the same finding — but several accounts for one brand belong together, so pick as many as share a brand."
+        />
+      ) : features.length === 0 ? (
         <EmptyState
           icon={Microscope}
           title="No creative analysed yet"
           description={
             remaining > 0
-              ? `${remaining} creatives have enough delivery to be worth reading. Each one is a vision call, so this runs ten at a time.`
-              : "Analysis needs at least directional evidence — a creative with a handful of impressions would only describe noise. Sync more performance data first."
+              ? `${remaining} creatives on the selected account${selected.length === 1 ? "" : "s"} have enough delivery to be worth reading. Each one is a vision call, so this runs ten at a time.`
+              : "No creative on the selected accounts has enough delivery yet. Analysis needs at least directional evidence — a creative with a handful of impressions would only describe noise."
           }
-          action={<AnalyseDnaButton eligible={remaining} />}
+          action={
+            <AnalyseDnaButton eligible={remaining} adAccountIds={selected} />
+          }
         />
       ) : (
         <>

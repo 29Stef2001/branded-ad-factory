@@ -350,3 +350,32 @@ export async function fetchPages(
     instagramActorId: page.instagram_business_account?.id ?? null,
   }));
 }
+
+/**
+ * A thumbnail URL that will still work when it is fetched.
+ *
+ * The ones stored during sync do not: Meta serves them from a CDN with an
+ * expiring signature, so a URL captured yesterday returns 403 today. Every DNA
+ * analysis failed on exactly that before this existed. Asking Meta again costs
+ * one small call and is the difference between an image and an error.
+ */
+export async function fetchFreshCreativeUrl(
+  metaAdId: string,
+  accessToken: string,
+): Promise<string | null> {
+  const params = new URLSearchParams({
+    fields: "creative{thumbnail_url,image_url}",
+    access_token: accessToken,
+  });
+
+  const response = await fetch(
+    `${GRAPH_BASE}/${metaAdId}?${params.toString()}`,
+  );
+  const body = await response.json();
+  if (!response.ok || body.error) return null;
+
+  const creative = body.creative ?? {};
+  // Thumbnail first: it is smaller, which matters when ten of them go to a
+  // vision model in one run.
+  return creative.thumbnail_url ?? creative.image_url ?? null;
+}

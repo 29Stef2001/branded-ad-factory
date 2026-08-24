@@ -14,7 +14,13 @@ import { analyseCreativeDnaAction } from "@/features/creative-intelligence/appli
  * quietly, which is the wrong default for something whose value depends on
  * there being enough performance data to be worth reading.
  */
-export function AnalyseDnaButton({ eligible }: { eligible: number }) {
+export function AnalyseDnaButton({
+  eligible,
+  adAccountIds,
+}: {
+  eligible: number;
+  adAccountIds: string[];
+}) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, start] = useTransition();
@@ -24,12 +30,12 @@ export function AnalyseDnaButton({ eligible }: { eligible: number }) {
       <Button
         type="button"
         size="sm"
-        disabled={running || eligible === 0}
+        disabled={running || eligible === 0 || adAccountIds.length === 0}
         onClick={() =>
           start(async () => {
             setError(null);
             setMessage(null);
-            const result = await analyseCreativeDnaAction();
+            const result = await analyseCreativeDnaAction(adAccountIds);
             if (result.error) setError(result.error);
             else setMessage(result.message);
           })

@@ -16,6 +16,8 @@ import {
   recordAnalysisRun,
   upsertCreativeFeatures,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
+import { fetchFreshCreativeUrl } from "@/features/creative-intelligence/infrastructure/meta-graph-client";
+import { getConnection } from "@/features/ad-performance/infrastructure/ad-performance-repository";
 import { requireUserId } from "@/features/ad-concepts/application/require-user";
 
 /**
@@ -67,6 +69,8 @@ function inputHashFor(
 }
 
 export async function analyseCreativeDnaAction(
+  /** Which accounts to read. Nothing is analysed until one is chosen. */
+  adAccountIds: string[],
   limit = DEFAULT_LIMIT,
 ): Promise<DnaRunResult> {
   const { userId, denied } = await requireUserId();
@@ -80,11 +84,32 @@ export async function analyseCreativeDnaAction(
     };
   }
 
+  if (adAccountIds.length === 0) {
+    return {
+      analysed: 0,
+      skipped: 0,
+      failed: 0,
+      message: "",
+      error: "Pick at least one ad account — patterns belong to an account.",
+    };
+  }
+
+  const connection = await getConnection();
+  if (!connection) {
+    return {
+      analysed: 0,
+      skipped: 0,
+      failed: 0,
+      message: "",
+      error: "No Meta account is connected.",
+    };
+  }
+
   let candidates;
   let alreadyDone: Set<string>;
   try {
     [candidates, alreadyDone] = await Promise.all([
-      listCreativesForDna(userId, TIERS, limit * 3),
+      listCreativesForDna(userId, TIERS, limit * 3, adAccountIds),
       listAnalysedEntityIds(userId),
     ]);
   } catch (error) {
@@ -98,10 +123,10 @@ export async function analyseCreativeDnaAction(
     };
   }
 
-  const todo = candidates
+  const eligible = candidates
     .filter((creative) => isWorthAnalysing(creative.evidenceTier))
-    .filter((creative) => !alreadyDone.has(creative.metaEntityId))
-    .slice(0, limit);
+    .filter((creative) => !alreadyDone.has(creative.metaEntityId));
+  const todo = eligible.slice(0, limit);
 
   if (todo.length === 0) {
     return {
@@ -124,7 +149,18 @@ export async function analyseCreativeDnaAction(
     const hash = inputHashFor(creative.thumbnailUrl!, creative);
 
     try {
-      const response = await fetch(creative.thumbnailUrl!);
+      // Asked for again rather than reused: Meta's CDN signs these and the URL
+      // captured during sync returns 403 within a day. Every analysis failed
+      // on exactly that before this call existed.
+      const freshUrl = await fetchFreshCreativeUrl(
+        creative.metaAdId,
+        connection.access_token,
+      );
+      if (!freshUrl) {
+        throw new Error("Meta no longer returns an image for this ad.");
+      }
+
+      const response = await fetch(freshUrl);
       if (!response.ok) {
         throw new Error(
           `Could not fetch the creative (HTTP ${response.status}).`,
@@ -186,16 +222,19 @@ export async function analyseCreativeDnaAction(
   revalidatePath("/dashboard/intelligence/dna");
   revalidatePath("/dashboard/intelligence");
 
+  // Counted honestly: what is left is what this run did not reach, which is
+  // not the same as what already had DNA. Saying so wrongly made a working
+  // run look like it had nothing to do.
+  const remaining = eligible.length - todo.length;
+
   return {
     analysed,
-    skipped: candidates.length - todo.length,
+    skipped: remaining,
     failed,
     message:
       `Analysed ${analysed} creative${analysed === 1 ? "" : "s"}` +
       (failed > 0 ? `, ${failed} failed` : "") +
-      (candidates.length > todo.length
-        ? `. ${candidates.length - todo.length} already had DNA.`
-        : "."),
+      (remaining > 0 ? `. ${remaining} still waiting — run it again.` : "."),
     error: null,
   };
 }

@@ -61,6 +61,7 @@ export async function scoreWindow(
       ...score,
       conceptId: conceptByEntity.get(entityTotals.metaEntityId) ?? null,
       metaEntityId: entityTotals.metaEntityId,
+      adAccountId: entityTotals.adAccountId,
       windowDays,
       totals: entityTotals as MetricTotals,
       percentileRank: null as number | null,

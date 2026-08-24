@@ -301,6 +301,8 @@ export type EntityTotals = MetricTotals & {
   metaEntityId: string;
   conceptId: string | null;
   lastServedDate: string | null;
+  /** Which account these facts came from, carried into the scores. */
+  adAccountId: string | null;
 };
 
 /**
@@ -320,7 +322,7 @@ export async function totalsByEntity(
     supabase
       .from("ad_insights_daily")
       .select(
-        "meta_entity_id, stat_date, impressions, clicks, link_clicks, spend, purchases, revenue, add_to_cart, initiate_checkout, landing_page_views",
+        "meta_entity_id, stat_date, ad_account_id, impressions, clicks, link_clicks, spend, purchases, revenue, add_to_cart, initiate_checkout, landing_page_views",
       ),
     userId,
   );
@@ -340,6 +342,7 @@ export async function totalsByEntity(
   type InsightRow = {
     meta_entity_id: string;
     stat_date: string;
+    ad_account_id: string | null;
     impressions: number;
     clicks: number;
     link_clicks: number;
@@ -366,6 +369,7 @@ export async function totalsByEntity(
       metaEntityId: row.meta_entity_id,
       conceptId: null,
       lastServedDate: null,
+      adAccountId: row.ad_account_id,
       impressions: 0,
       clicks: 0,
       linkClicks: 0,
@@ -526,6 +530,7 @@ export async function upsertCreativeMetrics(
     windowDays: number;
     totals: MetricTotals;
     percentileRank: number | null;
+    adAccountId: string | null;
   })[],
   db?: Db,
 ): Promise<void> {
@@ -537,6 +542,9 @@ export async function upsertCreativeMetrics(
       user_id: userId,
       concept_id: row.conceptId,
       meta_entity_id: row.metaEntityId,
+      // Without this every score is unattributable to a brand, and filtering
+      // the DNA page by account finds almost nothing.
+      ad_account_id: row.adAccountId,
       window_days: row.windowDays,
       impressions: row.totals.impressions,
       clicks: row.totals.clicks,
@@ -1057,10 +1065,22 @@ export async function listCreativesForDna(
   userId: string,
   tiers: string[],
   limit: number,
+  /**
+   * Scoped to the chosen accounts.
+   *
+   * Empty means none: nothing is read until a choice is made. Reading every
+   * account together would count a jewellery hook and a headwear hook as the
+   * same finding, which is how a tally stops meaning anything — but several
+   * accounts for one brand belong together, so this takes a list rather than
+   * one.
+   */
+  adAccountIds: string[],
   db?: Db,
 ): Promise<
   {
     metaEntityId: string;
+    metaAdId: string;
+    adAccountId: string | null;
     adName: string;
     thumbnailUrl: string | null;
     impressions: number;
@@ -1075,14 +1095,19 @@ export async function listCreativesForDna(
 > {
   const supabase = await resolve(db);
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("creative_metrics")
     .select(
-      "meta_entity_id, impressions, clicks, spend, purchases, revenue, ctr, roas, evidence_tier, meta_ad_entities(name, thumbnail_url)",
+      "meta_entity_id, ad_account_id, impressions, clicks, spend, purchases, revenue, ctr, roas, evidence_tier, meta_ad_entities(name, meta_id, thumbnail_url)",
     )
     .eq("user_id", userId)
     .eq("window_days", 30)
-    .in("evidence_tier", tiers)
+    .in("evidence_tier", tiers);
+
+  if (adAccountIds.length === 0) return [];
+  const scoped = query.in("ad_account_id", adAccountIds);
+
+  const { data, error } = await scoped
     .order("composite_score", { ascending: false, nullsFirst: false })
     .limit(limit);
 
@@ -1092,12 +1117,15 @@ export async function listCreativesForDna(
     .map((row) => {
       const entity = row.meta_ad_entities as unknown as {
         name: string;
+        meta_id: string;
         thumbnail_url: string | null;
       } | null;
       if (!row.meta_entity_id || !entity?.thumbnail_url) return null;
 
       return {
         metaEntityId: row.meta_entity_id,
+        metaAdId: entity.meta_id,
+        adAccountId: row.ad_account_id,
         adName: entity.name,
         thumbnailUrl: entity.thumbnail_url,
         impressions: Number(row.impressions),
@@ -1218,20 +1246,40 @@ export async function upsertCreativeFeatures(
 }
 
 export async function listCreativeFeatures(
+  adAccountIds: string[],
   db?: Db,
 ): Promise<(CreativeFeatureRow & { ad_name: string | null })[]> {
+  if (adAccountIds.length === 0) return [];
+
   const supabase = await resolve(db);
   const { data, error } = await supabase
     .from("creative_features")
     .select(
-      "id, meta_entity_id, hook_type, hook_text, angle, awareness_level, offer_type, offer_strength, emotional_driver, format, composition, visual_pattern, has_person, shows_product, text_on_image, proof_type, brightness, why_it_works, created_at, meta_ad_entities(name)",
+      "id, meta_entity_id, hook_type, hook_text, angle, awareness_level, offer_type, offer_strength, emotional_driver, format, composition, visual_pattern, has_person, shows_product, text_on_image, proof_type, brightness, why_it_works, created_at, meta_ad_entities(name, ad_account_id)",
     )
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => {
-    const entity = row.meta_ad_entities as unknown as { name: string } | null;
-    return { ...row, ad_name: entity?.name ?? null };
-  });
+  return (
+    (data ?? [])
+      .map((row) => {
+        const entity = row.meta_ad_entities as unknown as {
+          name: string;
+          ad_account_id: string | null;
+        } | null;
+        return {
+          ...row,
+          ad_name: entity?.name ?? null,
+          _account: entity?.ad_account_id ?? null,
+        };
+      })
+      // Filtered here rather than in the query: the account lives on the joined
+      // entity, and PostgREST cannot filter a parent by a child column without a
+      // view. At this volume the difference is not measurable.
+      .filter(
+        (row) => row._account !== null && adAccountIds.includes(row._account),
+      )
+      .map(({ _account: _drop, ...row }) => row)
+  );
 }
