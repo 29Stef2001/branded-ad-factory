@@ -13,8 +13,11 @@ import {
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import { dnaLabel } from "@/features/creative-intelligence/domain/creative-dna";
 import { DnaAccountPicker } from "@/features/creative-intelligence/ui/dna-account-picker";
-import { listSelectedAdAccounts } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
-import { canRunAds } from "@/features/creative-intelligence/domain/account-status";
+import { listAdAccounts } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
+import {
+  ACCOUNT_STATUS_LABELS,
+  canRunAds,
+} from "@/features/creative-intelligence/domain/account-status";
 
 export const metadata: Metadata = {
   title: "Creative DNA — Branded Ad Factory",
@@ -31,9 +34,10 @@ export default async function CreativeDnaPage({
   const { accounts: accountsParam } = await searchParams;
   const user = await getCurrentUser();
 
-  const accounts = (await listSelectedAdAccounts()).filter((row) =>
-    canRunAds(row.account_status),
-  );
+  // Every account the workspace knows about, not just what was ticked
+  // elsewhere. Which accounts to read patterns from is this page's question,
+  // and answering it should not mean going somewhere else first.
+  const accounts = await listAdAccounts();
   // Nothing is read until a choice is made: patterns belong to a brand, and
   // pooling unrelated accounts counts unrelated hooks as one finding.
   const selected = (accountsParam ?? "")
@@ -103,6 +107,12 @@ export default async function CreativeDnaPage({
                 eligible: allEligible.filter(
                   (creative) => creative.adAccountId === row.ad_account_id,
                 ).length,
+                // Named rather than hidden: an account that cannot run ads
+                // still has history worth reading.
+                status: canRunAds(row.account_status)
+                  ? null
+                  : (ACCOUNT_STATUS_LABELS[row.account_status ?? -1] ??
+                    "Unavailable"),
               }))}
               selected={selected}
             />
