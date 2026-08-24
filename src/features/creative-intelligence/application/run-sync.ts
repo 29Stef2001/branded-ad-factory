@@ -57,12 +57,27 @@ export type SyncOutcome = {
 
 /**
  * One pass of ingest → attribute → score.
- *
- * Attribution and scoring only run once ingestion has finished: scoring a
- * half-ingested window would write numbers that are wrong until the next run,
- * and a dashboard that is briefly wrong is worse than one that is briefly
- * stale.
  */
+
+/**
+ * Held back from the ingest budget for the work that always follows it.
+ *
+ * `budgetMs` used to be spent entirely on ingestion, but attribution and
+ * scoring run after it on every pass, partial ones included. The caller's
+ * budget is a promise about the whole invocation — the platform kills the
+ * function at its own ceiling regardless of what this code intended — so
+ * giving ingest all of it put the tail over the edge: a 45s ingest followed by
+ * ~16s of attribution and scoring was killed at 61s, and `finishJobRun` never
+ * ran, so the pass lost the cursor recording where it had got to.
+ *
+ * Generous on purpose. Overshooting the ceiling costs the whole pass and its
+ * cursor; reserving too much only fetches fewer rows, and the next run resumes
+ * from where this one stopped.
+ */
+const POST_PROCESSING_RESERVE_MS = 20_000;
+
+/** Below this an ingest pass fetches too little to be worth claiming the job. */
+const MIN_INGEST_MS = 5_000;
 export async function runSyncPass(
   userId: string,
   trigger: "cron" | "manual",
@@ -102,7 +117,7 @@ export async function runSyncPass(
     const step = await runSyncUntilBudget(
       userId,
       resumeFrom,
-      budgetMs,
+      Math.max(budgetMs - POST_PROCESSING_RESERVE_MS, MIN_INGEST_MS),
       db,
       connection,
       accountIds,

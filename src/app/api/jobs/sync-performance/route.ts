@@ -32,8 +32,16 @@ export const maxDuration = 60;
  * next run, which is exactly what the resumable design is for.
  */
 const HANDLER_BUDGET_MS = 45_000;
-/** Below this there is no point starting another account. */
-const MIN_ACCOUNT_BUDGET_MS = 8_000;
+/**
+ * Below this there is no point starting another connection.
+ *
+ * It has to cover what a pass actually costs, not just its ingest: every pass
+ * ends with attribution and scoring, which runSyncPass reserves twenty seconds
+ * for. Eight was the old figure, from when the budget bought ingestion alone —
+ * with it, a connection could be started with eight seconds left, take thirty,
+ * and be killed by the platform mid-write.
+ */
+const MIN_ACCOUNT_BUDGET_MS = 28_000;
 
 function authorised(request: NextRequest): boolean {
   // Unset means unavailable, never open: an endpoint that spends API quota
