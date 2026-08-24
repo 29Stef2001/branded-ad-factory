@@ -1062,7 +1062,15 @@ export type CreativeFeatureRow = Pick<
  * that actually matter.
  */
 export async function listCreativesForDna(
-  userId: string,
+  /**
+   * Optional, and normally omitted.
+   *
+   * RLS already scopes this table to the caller, so the interactive path does
+   * not need it — and requiring it added a way to return nothing at all when a
+   * session lookup came back empty, which is exactly what happened. Jobs
+   * running as service role pass it, because there RLS is off.
+   */
+  userId: string | undefined,
   tiers: string[],
   limit: number,
   /**
@@ -1100,12 +1108,11 @@ export async function listCreativesForDna(
     .select(
       "meta_entity_id, ad_account_id, impressions, clicks, spend, purchases, revenue, ctr, roas, evidence_tier, meta_ad_entities(name, meta_id, thumbnail_url)",
     )
-    .eq("user_id", userId)
     .eq("window_days", 30)
     .in("evidence_tier", tiers);
 
   if (adAccountIds.length === 0) return [];
-  const scoped = query.in("ad_account_id", adAccountIds);
+  const scoped = scopedToUser(query, userId).in("ad_account_id", adAccountIds);
 
   const { data, error } = await scoped
     .order("composite_score", { ascending: false, nullsFirst: false })

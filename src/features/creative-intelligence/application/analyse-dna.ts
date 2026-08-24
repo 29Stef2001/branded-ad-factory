@@ -109,7 +109,7 @@ export async function analyseCreativeDnaAction(
   let alreadyDone: Set<string>;
   try {
     [candidates, alreadyDone] = await Promise.all([
-      listCreativesForDna(userId, TIERS, limit * 3, adAccountIds),
+      listCreativesForDna(undefined, TIERS, limit * 3, adAccountIds),
       listAnalysedEntityIds(userId),
     ]);
   } catch (error) {

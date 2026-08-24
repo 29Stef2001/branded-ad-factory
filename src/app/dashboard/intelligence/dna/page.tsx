@@ -10,7 +10,6 @@ import {
   listCreativeFeatures,
   listCreativesForDna,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
-import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import { dnaLabel } from "@/features/creative-intelligence/domain/creative-dna";
 import { DnaAccountPicker } from "@/features/creative-intelligence/ui/dna-account-picker";
 import { listAdAccounts } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
@@ -32,8 +31,6 @@ export default async function CreativeDnaPage({
   searchParams: Promise<{ accounts?: string }>;
 }) {
   const { accounts: accountsParam } = await searchParams;
-  const user = await getCurrentUser();
-
   // Every account the workspace knows about, not just what was ticked
   // elsewhere. Which accounts to read patterns from is this page's question,
   // and answering it should not mean going somewhere else first.
@@ -47,20 +44,18 @@ export default async function CreativeDnaPage({
 
   // Every eligible creative, so each account can show how much there is to
   // read before it is picked.
-  const allEligible = user
-    ? await listCreativesForDna(
-        user.id,
-        ["confident", "directional"],
-        500,
-        accounts.map((row) => row.ad_account_id),
-      )
-    : [];
+  const allEligible = await listCreativesForDna(
+    undefined,
+    ["confident", "directional"],
+    500,
+    accounts.map((row) => row.ad_account_id),
+  );
 
   const [features, eligible] = await Promise.all([
     listCreativeFeatures(selected),
-    user && selected.length > 0
+    selected.length > 0
       ? listCreativesForDna(
-          user.id,
+          undefined,
           ["confident", "directional"],
           200,
           selected,
