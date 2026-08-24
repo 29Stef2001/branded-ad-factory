@@ -88,6 +88,17 @@ export async function runSyncPass(
     );
 
     if (!step.done) {
+      // Score what has landed rather than waiting for the whole sync.
+      //
+      // With thirty accounts a pass never finishes inside one invocation, so
+      // gating scoring on completion meant it simply stopped running: the
+      // scores froze on the day the account list grew, and forty-one purchases
+      // sat in the facts while every ranking still read zero. Scoring is
+      // deterministic and cheap, so running it on a partial ingest costs
+      // nothing and keeps the numbers honest about what is known so far.
+      const partialAttribution = await attributeUnlinkedAds(userId, db);
+      const partialScoring = await scoreAllWindows(userId, db);
+
       await finishJobRun(
         job.id,
         {
@@ -100,7 +111,11 @@ export async function runSyncPass(
       return {
         status: "partial",
         processed: step.processed,
-        message: `Synced ${step.processed} rows. More to fetch — the next run resumes from here.`,
+        attributed: partialAttribution.autoConfirmed,
+        scored: partialScoring.scored,
+        message:
+          `Synced ${step.processed} rows and scored ${partialScoring.scored} creatives so far. ` +
+          `More to fetch — the next run resumes from here.`,
       };
     }
 
@@ -150,7 +165,20 @@ export async function runSyncPass(
           ? error.message
           : String(error);
 
-    console.error("Meta sync failed", { userId, error });
+    // Logged field by field: an Error does not survive JSON serialisation, so
+    // the object form printed "{}" and hid every failure behind "An unknown
+    // error occurred". A log that cannot say what broke costs more than the
+    // bug it is hiding.
+    console.error("Meta sync failed", {
+      userId,
+      message,
+      name: error instanceof Error ? error.name : typeof error,
+      stack: error instanceof Error ? error.stack : undefined,
+      // Supabase errors carry these instead of a stack.
+      details: (error as { details?: string })?.details,
+      hint: (error as { hint?: string })?.hint,
+      code: (error as { code?: string })?.code,
+    });
     await finishJobRun(job.id, { status: "failed", error: message }, db);
 
     return { status: "failed", processed: 0, message };

@@ -108,23 +108,36 @@ export function wilsonLowerBound(
 }
 
 /**
+ * How much spend the prior is worth, in account currency.
+ *
+ * The prior counts as if it were this much observed spend, so a creative with
+ * £0.50 behind it is dominated by the account average while one with £2,000 is
+ * barely touched. Set at £50 because that is roughly where a single order stops
+ * being able to move the ratio on its own.
+ */
+export const PRIOR_STRENGTH = 50;
+
+/**
  * Empirical-Bayes shrinkage of a ratio toward a prior.
  *
  * ROAS on small spend is noisier than CTR — a single order swings it wildly. A
- * creative with $3 spend and one $80 order does not get to claim 26x. `weight`
- * is the prior's strength in units of the observation's own denominator: at 1.0
- * the prior and the observation carry equal weight when spend equals the
- * account's average.
+ * creative with £0.50 spend and one £52 order does not get to claim 105x.
+ *
+ * `strength` is a fixed mass in the denominator's own units, not a multiple of
+ * the observation. That distinction is the whole mechanism, and getting it
+ * backwards is what this used to do: scaling the prior with the denominator
+ * gave a tiny sample a tiny prior, so 105x shrank only to 53x and still topped
+ * the ranking. With a fixed mass the same creative lands at 2.2x while an
+ * account-sized sample stays where it is.
  */
 export function shrinkRatio(
   numerator: number,
   denominator: number,
   prior: number,
-  weight = 1,
+  strength = PRIOR_STRENGTH,
 ): number | null {
   if (denominator <= 0) return null;
-  const priorMass = weight * denominator;
-  return (numerator + prior * priorMass) / (denominator + priorMass);
+  return (numerator + prior * strength) / (denominator + strength);
 }
 
 export function evidenceTierFor(totals: MetricTotals): EvidenceTier {
@@ -215,15 +228,25 @@ export function scoreCreative(
   // proven earner. Missing measurement and measured failure are not the same
   // thing, and only the first justifies dropping the term.
   if (baseline.hasConversionTracking && spend > 0) {
+    // Weight, not just value, scales with the spend behind it.
+    //
+    // Shrinkage alone was not enough: a creative with £2 and no conversions
+    // shrinks to the account average, which reads as "fine", while one with
+    // £300 and no conversions shrinks to near zero — so the cheaper failure
+    // outranked the proven one. That is right about the ratio and wrong about
+    // the ad. Almost no spend means almost no efficiency signal, so the
+    // component earns almost none of its weight and the other axes decide.
+    const efficiencyConfidence = spend / (spend + PRIOR_STRENGTH);
+
     if (roasShrunk !== null && baseline.roas > 0) {
       components.push({
-        weight: COMPOSITE_WEIGHTS.efficiency,
+        weight: COMPOSITE_WEIGHTS.efficiency * efficiencyConfidence,
         value: ratioToUnit(roasShrunk, baseline.roas),
       });
     } else if (cpa !== null && cpa > 0) {
       // Lower is better, so the reference sits in the numerator.
       components.push({
-        weight: COMPOSITE_WEIGHTS.efficiency,
+        weight: COMPOSITE_WEIGHTS.efficiency * efficiencyConfidence,
         value: ratioToUnit(spend / Math.max(purchases, 1), cpa),
       });
     }

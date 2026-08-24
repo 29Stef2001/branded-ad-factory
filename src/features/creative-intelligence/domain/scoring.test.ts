@@ -95,12 +95,28 @@ describe("shrinkRatio", () => {
     const raw = 6000 / 2000;
     const shrunk = shrinkRatio(6000, 2000, 2)!;
 
-    expect(shrunk).toBeCloseTo(2.5, 1);
-    expect(Math.abs(raw - shrunk)).toBeLessThan(0.6);
+    // £2,000 of spend swamps a £50 prior, so the observed ratio stands.
+    expect(shrunk).toBeCloseTo(raw, 1);
+    expect(Math.abs(raw - shrunk)).toBeLessThan(0.05);
   });
 
-  it("returns the prior when there is no observation to weigh", () => {
-    expect(shrinkRatio(0, 100, 2)).toBeCloseTo(1, 5);
+  it("pulls a tiny sample most of the way to the prior", () => {
+    // The case this exists for, from the live data: £0.50 spend and one £52.57
+    // order reads as 105x and topped the ranking.
+    const raw = 52.57 / 0.5;
+    const shrunk = shrinkRatio(52.57, 0.5, 1.17)!;
+
+    expect(raw).toBeGreaterThan(100);
+    expect(shrunk).toBeLessThan(3);
+  });
+
+  it("treats spend with no revenue as evidence, not absence", () => {
+    // £100 spent and nothing earned is a real, poor result: it pulls well
+    // below the prior rather than resting on it.
+    const shrunk = shrinkRatio(0, 100, 2)!;
+
+    expect(shrunk).toBeLessThan(2);
+    expect(shrunk).toBeGreaterThan(0);
   });
 
   it("returns null rather than dividing by zero", () => {
@@ -255,13 +271,17 @@ describe("scoreCreative", () => {
   });
 
   it("ranks a proven creative above a lucky one with the same raw CTR", () => {
+    // No conversion tracking, so this isolates what it means to test: sample
+    // size. With tracking on, a creative that burned £300 without converting
+    // is judged on that instead, which is a different question.
+    const noTracking = { ...baseline, roas: 0, hasConversionTracking: false };
     const lucky = scoreCreative(
       totals({ impressions: 100, clicks: 8, spend: 2 }),
-      baseline,
+      noTracking,
     );
     const proven = scoreCreative(
       totals({ impressions: 20_000, clicks: 1600, spend: 300 }),
-      baseline,
+      noTracking,
     );
 
     expect(lucky.ctr).toBeCloseTo(proven.ctr!, 2);
