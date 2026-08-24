@@ -82,6 +82,7 @@ export const NAV_TREE: NavEntry[] = [
     items: [
       { label: "Creative Performance", segment: "intelligence" },
       { label: "Ad Accounts", segment: "intelligence/accounts" },
+      { label: "Creative DNA", segment: "intelligence/dna" },
       {
         label: "Attribution",
         segment: "intelligence/attribution",

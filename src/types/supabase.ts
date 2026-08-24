@@ -1609,6 +1609,60 @@ export type Database = {
         }
         Relationships: []
       }
+      analysis_runs: {
+        Row: {
+          analysis_type: string
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          input_hash: string
+          input_tokens: number | null
+          model: string
+          output_tokens: number | null
+          prompt_version: string
+          result: Json | null
+          status: string
+          subject_id: string | null
+          subject_type: string
+          user_id: string
+        }
+        Insert: {
+          analysis_type: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input_hash: string
+          input_tokens?: number | null
+          model: string
+          output_tokens?: number | null
+          prompt_version: string
+          result?: Json | null
+          status: string
+          subject_id?: string | null
+          subject_type: string
+          user_id: string
+        }
+        Update: {
+          analysis_type?: string
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          input_hash?: string
+          input_tokens?: number | null
+          model?: string
+          output_tokens?: number | null
+          prompt_version?: string
+          result?: Json | null
+          status?: string
+          subject_id?: string | null
+          subject_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       approved_promotional_messages: {
         Row: {
           brand_profile_id: string
@@ -1938,6 +1992,102 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      creative_features: {
+        Row: {
+          analysis_run_id: string | null
+          angle: string | null
+          awareness_level: string | null
+          brightness: string | null
+          composition: string | null
+          content_hash: string
+          created_at: string
+          dominant_colors: string[] | null
+          emotional_driver: string | null
+          format: string | null
+          has_person: boolean | null
+          hook_text: string | null
+          hook_type: string | null
+          id: string
+          meta_entity_id: string
+          offer_strength: string | null
+          offer_type: string | null
+          proof_type: string | null
+          shows_product: boolean | null
+          text_on_image: boolean | null
+          updated_at: string
+          user_id: string
+          visual_pattern: string | null
+          why_it_works: string[] | null
+        }
+        Insert: {
+          analysis_run_id?: string | null
+          angle?: string | null
+          awareness_level?: string | null
+          brightness?: string | null
+          composition?: string | null
+          content_hash: string
+          created_at?: string
+          dominant_colors?: string[] | null
+          emotional_driver?: string | null
+          format?: string | null
+          has_person?: boolean | null
+          hook_text?: string | null
+          hook_type?: string | null
+          id?: string
+          meta_entity_id: string
+          offer_strength?: string | null
+          offer_type?: string | null
+          proof_type?: string | null
+          shows_product?: boolean | null
+          text_on_image?: boolean | null
+          updated_at?: string
+          user_id: string
+          visual_pattern?: string | null
+          why_it_works?: string[] | null
+        }
+        Update: {
+          analysis_run_id?: string | null
+          angle?: string | null
+          awareness_level?: string | null
+          brightness?: string | null
+          composition?: string | null
+          content_hash?: string
+          created_at?: string
+          dominant_colors?: string[] | null
+          emotional_driver?: string | null
+          format?: string | null
+          has_person?: boolean | null
+          hook_text?: string | null
+          hook_type?: string | null
+          id?: string
+          meta_entity_id?: string
+          offer_strength?: string | null
+          offer_type?: string | null
+          proof_type?: string | null
+          shows_product?: boolean | null
+          text_on_image?: boolean | null
+          updated_at?: string
+          user_id?: string
+          visual_pattern?: string | null
+          why_it_works?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_features_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_features_meta_entity_id_fkey"
+            columns: ["meta_entity_id"]
+            isOneToOne: true
+            referencedRelation: "meta_ad_entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       creative_generations: {
         Row: {

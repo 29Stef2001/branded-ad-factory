@@ -1018,3 +1018,220 @@ export async function setDefaultPage(
     .eq("page_id", pageId);
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// Creative DNA
+// ---------------------------------------------------------------------------
+
+export type CreativeFeatureRow = Pick<
+  Tables<"creative_features">,
+  | "id"
+  | "meta_entity_id"
+  | "hook_type"
+  | "hook_text"
+  | "angle"
+  | "awareness_level"
+  | "offer_type"
+  | "offer_strength"
+  | "emotional_driver"
+  | "format"
+  | "composition"
+  | "visual_pattern"
+  | "has_person"
+  | "shows_product"
+  | "text_on_image"
+  | "proof_type"
+  | "brightness"
+  | "why_it_works"
+  | "created_at"
+>;
+
+/**
+ * Creatives worth analysing, best first.
+ *
+ * Joined to their scores because the analysis is only meaningful beside them —
+ * and ordered by score so a budget-limited run spends what it has on the ads
+ * that actually matter.
+ */
+export async function listCreativesForDna(
+  userId: string,
+  tiers: string[],
+  limit: number,
+  db?: Db,
+): Promise<
+  {
+    metaEntityId: string;
+    adName: string;
+    thumbnailUrl: string | null;
+    impressions: number;
+    clicks: number;
+    spend: number;
+    purchases: number;
+    revenue: number;
+    ctr: number | null;
+    roas: number | null;
+    evidenceTier: string;
+  }[]
+> {
+  const supabase = await resolve(db);
+
+  const { data, error } = await supabase
+    .from("creative_metrics")
+    .select(
+      "meta_entity_id, impressions, clicks, spend, purchases, revenue, ctr, roas, evidence_tier, meta_ad_entities(name, thumbnail_url)",
+    )
+    .eq("user_id", userId)
+    .eq("window_days", 30)
+    .in("evidence_tier", tiers)
+    .order("composite_score", { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return (data ?? [])
+    .map((row) => {
+      const entity = row.meta_ad_entities as unknown as {
+        name: string;
+        thumbnail_url: string | null;
+      } | null;
+      if (!row.meta_entity_id || !entity?.thumbnail_url) return null;
+
+      return {
+        metaEntityId: row.meta_entity_id,
+        adName: entity.name,
+        thumbnailUrl: entity.thumbnail_url,
+        impressions: Number(row.impressions),
+        clicks: Number(row.clicks),
+        spend: Number(row.spend),
+        purchases: Number(row.purchases),
+        revenue: Number(row.revenue),
+        ctr: row.ctr === null ? null : Number(row.ctr),
+        roas: row.roas === null ? null : Number(row.roas),
+        evidenceTier: row.evidence_tier,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+}
+
+/** Entities that already have DNA, so a run skips what it has done. */
+export async function listAnalysedEntityIds(
+  userId: string,
+  db?: Db,
+): Promise<Set<string>> {
+  const supabase = await resolve(db);
+  const { data, error } = await supabase
+    .from("creative_features")
+    .select("meta_entity_id, content_hash")
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.meta_entity_id));
+}
+
+export async function recordAnalysisRun(
+  userId: string,
+  run: {
+    analysisType: string;
+    subjectType: string;
+    subjectId: string | null;
+    model: string;
+    promptVersion: string;
+    inputHash: string;
+    status: "succeeded" | "failed";
+    inputTokens?: number;
+    outputTokens?: number;
+    durationMs?: number;
+    error?: string;
+    result?: unknown;
+  },
+  db?: Db,
+): Promise<string | null> {
+  const supabase = await resolve(db);
+  const { data, error } = await supabase
+    .from("analysis_runs")
+    .insert({
+      user_id: userId,
+      analysis_type: run.analysisType,
+      subject_type: run.subjectType,
+      subject_id: run.subjectId,
+      model: run.model,
+      prompt_version: run.promptVersion,
+      input_hash: run.inputHash,
+      status: run.status,
+      input_tokens: run.inputTokens,
+      output_tokens: run.outputTokens,
+      duration_ms: run.durationMs,
+      error: run.error,
+      result: (run.result ?? null) as never,
+    })
+    .select("id")
+    .maybeSingle();
+
+  // 23505: this exact analysis already succeeded, which is the cache working.
+  if (error?.code === "23505") return null;
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
+export async function upsertCreativeFeatures(
+  userId: string,
+  features: {
+    metaEntityId: string;
+    contentHash: string;
+    analysisRunId: string | null;
+    dna: Record<string, unknown>;
+  },
+  db?: Db,
+): Promise<void> {
+  const supabase = await resolve(db);
+  const dna = features.dna as Record<string, never>;
+
+  const { error } = await supabase.from("creative_features").upsert(
+    {
+      user_id: userId,
+      meta_entity_id: features.metaEntityId,
+      content_hash: features.contentHash,
+      analysis_run_id: features.analysisRunId,
+      hook_type: dna.hookType,
+      hook_text: dna.hookText,
+      angle: dna.angle,
+      awareness_level: dna.awarenessLevel,
+      offer_type: dna.offerType,
+      offer_strength: dna.offerStrength,
+      emotional_driver: dna.emotionalDriver,
+      format: dna.format,
+      composition: dna.composition,
+      visual_pattern: dna.visualPattern,
+      has_person: dna.hasPerson,
+      shows_product: dna.showsProduct,
+      text_on_image: dna.textOnImage,
+      proof_type: dna.proofType,
+      dominant_colors: dna.dominantColors,
+      brightness: dna.brightness,
+      why_it_works: dna.whyItWorks,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "meta_entity_id" },
+  );
+
+  if (error) throw error;
+}
+
+export async function listCreativeFeatures(
+  db?: Db,
+): Promise<(CreativeFeatureRow & { ad_name: string | null })[]> {
+  const supabase = await resolve(db);
+  const { data, error } = await supabase
+    .from("creative_features")
+    .select(
+      "id, meta_entity_id, hook_type, hook_text, angle, awareness_level, offer_type, offer_strength, emotional_driver, format, composition, visual_pattern, has_person, shows_product, text_on_image, proof_type, brightness, why_it_works, created_at, meta_ad_entities(name)",
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => {
+    const entity = row.meta_ad_entities as unknown as { name: string } | null;
+    return { ...row, ad_name: entity?.name ?? null };
+  });
+}
