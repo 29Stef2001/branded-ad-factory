@@ -1928,36 +1928,63 @@ export type Database = {
           ad_creative_link_description: string | null
           ad_creative_link_title: string | null
           ad_delivery_start_time: string | null
+          ad_delivery_stop_time: string | null
           ad_snapshot_url: string | null
           competitor_id: string
           created_at: string
+          creative_image_url: string | null
+          creative_video_url: string | null
+          external_ad_id: string | null
+          first_seen_at: string
           id: string
-          meta_ad_archive_id: string
+          is_active: boolean | null
+          landing_page_url: string | null
+          last_seen_at: string
+          meta_ad_archive_id: string | null
           page_name: string | null
+          source_provider: string
         }
         Insert: {
           ad_creative_body?: string | null
           ad_creative_link_description?: string | null
           ad_creative_link_title?: string | null
           ad_delivery_start_time?: string | null
+          ad_delivery_stop_time?: string | null
           ad_snapshot_url?: string | null
           competitor_id: string
           created_at?: string
+          creative_image_url?: string | null
+          creative_video_url?: string | null
+          external_ad_id?: string | null
+          first_seen_at?: string
           id?: string
-          meta_ad_archive_id: string
+          is_active?: boolean | null
+          landing_page_url?: string | null
+          last_seen_at?: string
+          meta_ad_archive_id?: string | null
           page_name?: string | null
+          source_provider?: string
         }
         Update: {
           ad_creative_body?: string | null
           ad_creative_link_description?: string | null
           ad_creative_link_title?: string | null
           ad_delivery_start_time?: string | null
+          ad_delivery_stop_time?: string | null
           ad_snapshot_url?: string | null
           competitor_id?: string
           created_at?: string
+          creative_image_url?: string | null
+          creative_video_url?: string | null
+          external_ad_id?: string | null
+          first_seen_at?: string
           id?: string
-          meta_ad_archive_id?: string
+          is_active?: boolean | null
+          landing_page_url?: string | null
+          last_seen_at?: string
+          meta_ad_archive_id?: string | null
           page_name?: string | null
+          source_provider?: string
         }
         Relationships: [
           {
@@ -1969,27 +1996,117 @@ export type Database = {
           },
         ]
       }
-      competitors: {
+      competitor_creative_features: {
         Row: {
+          analysis_run_id: string | null
+          angle: string | null
+          awareness_level: string | null
+          competitor_ad_id: string
+          confidence: string
+          content_hash: string
           created_at: string
+          cta_style: string | null
+          emotional_driver: string | null
+          hook_text: string | null
+          hook_type: string | null
           id: string
-          meta_page_id: string
-          name: string
+          inferred_hypotheses: string[]
+          observed_facts: string[]
+          offer_strength: string | null
+          offer_type: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
+          analysis_run_id?: string | null
+          angle?: string | null
+          awareness_level?: string | null
+          competitor_ad_id: string
+          confidence: string
+          content_hash: string
           created_at?: string
+          cta_style?: string | null
+          emotional_driver?: string | null
+          hook_text?: string | null
+          hook_type?: string | null
           id?: string
-          meta_page_id: string
-          name: string
+          inferred_hypotheses?: string[]
+          observed_facts?: string[]
+          offer_strength?: string | null
+          offer_type?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
+          analysis_run_id?: string | null
+          angle?: string | null
+          awareness_level?: string | null
+          competitor_ad_id?: string
+          confidence?: string
+          content_hash?: string
           created_at?: string
+          cta_style?: string | null
+          emotional_driver?: string | null
+          hook_text?: string | null
+          hook_type?: string | null
           id?: string
+          inferred_hypotheses?: string[]
+          observed_facts?: string[]
+          offer_strength?: string | null
+          offer_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_creative_features_analysis_run_id_fkey"
+            columns: ["analysis_run_id"]
+            isOneToOne: false
+            referencedRelation: "analysis_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_creative_features_competitor_ad_id_fkey"
+            columns: ["competitor_ad_id"]
+            isOneToOne: true
+            referencedRelation: "competitor_ads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitors: {
+        Row: {
+          created_at: string
+          discovery_source: string
+          id: string
+          last_synced_at: string | null
+          meta_page_id: string
+          name: string
+          status: string
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          discovery_source?: string
+          id?: string
+          last_synced_at?: string | null
+          meta_page_id: string
+          name: string
+          status?: string
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          discovery_source?: string
+          id?: string
+          last_synced_at?: string | null
           meta_page_id?: string
           name?: string
+          status?: string
           user_id?: string
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -2787,6 +2904,57 @@ export type Database = {
           created_at?: string
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      suggested_competitors: {
+        Row: {
+          competitor_type: string | null
+          created_at: string
+          discovered_at: string | null
+          id: string
+          meta_page_id: string | null
+          name: string
+          reason: string
+          relevance_reasoning: string | null
+          relevance_score: number | null
+          reviewed_at: string | null
+          source: string
+          status: string
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          competitor_type?: string | null
+          created_at?: string
+          discovered_at?: string | null
+          id?: string
+          meta_page_id?: string | null
+          name: string
+          reason: string
+          relevance_reasoning?: string | null
+          relevance_score?: number | null
+          reviewed_at?: string | null
+          source?: string
+          status?: string
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          competitor_type?: string | null
+          created_at?: string
+          discovered_at?: string | null
+          id?: string
+          meta_page_id?: string | null
+          name?: string
+          reason?: string
+          relevance_reasoning?: string | null
+          relevance_score?: number | null
+          reviewed_at?: string | null
+          source?: string
+          status?: string
+          user_id?: string
+          website_url?: string | null
         }
         Relationships: []
       }

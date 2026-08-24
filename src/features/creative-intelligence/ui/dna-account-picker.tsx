@@ -74,11 +74,17 @@ export function DnaAccountPicker({
     );
 
   const withWork = accounts.filter((account) => account.eligible > 0);
+  // Accounts with something to read come first. Alphabetical order buried the
+  // five that matter among forty-four that do not, which is how someone ticks
+  // three empty ones and concludes the feature is broken.
+  const ordered = [...accounts].sort(
+    (a, b) => b.eligible - a.eligible || a.label.localeCompare(b.label),
+  );
   const visible = query.trim()
-    ? accounts.filter((account) =>
+    ? ordered.filter((account) =>
         account.label.toLowerCase().includes(query.trim().toLowerCase()),
       )
-    : accounts;
+    : ordered;
 
   const summary =
     selected.length === 0
@@ -112,6 +118,12 @@ export function DnaAccountPicker({
             placeholder="Search accounts…"
             className="h-8 rounded-md border border-border bg-transparent px-2 text-sm"
           />
+
+          <p className="px-1 text-xs text-muted-foreground">
+            {withWork.length === 0
+              ? "No account has a creative with enough delivery yet."
+              : `${withWork.length} account${withWork.length === 1 ? "" : "s"} ${withWork.length === 1 ? "has" : "have"} creatives worth reading — those are listed first.`}
+          </p>
 
           <div className="flex flex-wrap items-center gap-3 px-1">
             {withWork.length > 0 && (
@@ -162,7 +174,7 @@ export function DnaAccountPicker({
                   <span
                     className={
                       account.eligible > 0
-                        ? "shrink-0 text-xs text-muted-foreground tabular-nums"
+                        ? "shrink-0 rounded-full bg-success/15 px-1.5 text-xs text-success tabular-nums"
                         : "shrink-0 text-xs text-muted-foreground/40 tabular-nums"
                     }
                     title={
@@ -171,7 +183,7 @@ export function DnaAccountPicker({
                         : "No creative with enough delivery yet"
                     }
                   >
-                    {account.eligible}
+                    {account.eligible > 0 ? account.eligible : "—"}
                   </span>
                 </label>
               ))

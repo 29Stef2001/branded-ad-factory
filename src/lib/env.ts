@@ -24,6 +24,14 @@ export const env = createEnv({
     // src/lib/supabase/admin.ts. Optional so the app runs without it; the
     // scheduled jobs refuse to start rather than silently reading nothing.
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    // Hermes Agent MCP gateway (src/app/api/mcp/route.ts). Bearer secret the
+    // Hermes deployment authenticates with, and the single workspace user its
+    // tool calls act as — this app has one workspace, so "which tenant" is a
+    // fixed mapping baked into these two variables rather than something
+    // negotiated per request. Both optional so the app runs without Hermes
+    // configured; the route refuses requests rather than defaulting to open.
+    HERMES_MCP_TOKEN: z.string().min(32).optional(),
+    HERMES_MCP_USER_ID: z.string().uuid().optional(),
   },
   client: {
     NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
@@ -41,6 +49,8 @@ export const env = createEnv({
     SHOPIFY_STORE_HOSTNAME: process.env.SHOPIFY_STORE_HOSTNAME,
     CRON_SECRET: process.env.CRON_SECRET,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    HERMES_MCP_TOKEN: process.env.HERMES_MCP_TOKEN,
+    HERMES_MCP_USER_ID: process.env.HERMES_MCP_USER_ID,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,

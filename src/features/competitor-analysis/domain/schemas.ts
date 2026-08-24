@@ -8,23 +8,19 @@ export const addCompetitorSchema = z.object({
     .regex(/^\d+$/, "Meta Page ID must be numeric"),
 });
 
-export const adAnalysisSchema = z.object({
-  messagingAngle: z
+/**
+ * A flagged-but-not-tracked competitor. metaPageId is optional here — someone
+ * flagging "this brand keeps showing up" may not have looked up the Page ID
+ * yet, and requiring it up front would stop the flag from being raised at
+ * all. Approving the suggestion is where it becomes required.
+ */
+export const suggestCompetitorSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  metaPageId: z
     .string()
-    .describe("The core marketing angle or positioning the ad takes"),
-  hook: z
-    .string()
-    .describe("The opening line or visual hook used to grab attention"),
-  tone: z
-    .string()
-    .describe("The overall tone of voice, e.g. playful, urgent, aspirational"),
-  targetAudience: z
-    .string()
-    .describe("The audience this ad appears to be written for"),
-  callToAction: z.string().describe("The specific call to action used"),
-  summary: z
-    .string()
-    .describe("A 1-2 sentence summary of the ad's overall strategy"),
+    .regex(/^\d+$/, "Meta Page ID must be numeric")
+    .optional()
+    .or(z.literal("")),
+  reason: z.string().min(1, "Say why this looks like a competitor"),
 });
 
-export type AdAnalysis = z.infer<typeof adAnalysisSchema>;

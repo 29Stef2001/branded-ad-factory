@@ -64,31 +64,107 @@ only once a server-only/admin feature actually needs it. Auth (`src/features/aut
 ## Competitor ad analysis
 
 `src/features/competitor-analysis` tracks a competitor's Meta (Facebook/Instagram) Page and pulls their
-ads from the public Meta Ad Library API (`ads_archive`), then generates AI analysis of each ad's copy on
-demand:
+ads from the public Meta Ad Library API (`ads_archive`), then reads a closed-vocabulary Competitor Creative
+DNA from each ad's copy — the Creative Factory's Phase 1 counterpart to `creative-intelligence`'s DNA read
+on the user's own winners:
 
-- **Ingestion is fetch-on-add**: adding a competitor (name + numeric Meta Page ID) immediately calls the
-  Ad Library API server-side and upserts the returned ads by `meta_ad_archive_id`. There is no background
-  job — a manual "refresh" action can be added later if needed.
-- **Analysis is on-demand per ad**, not automatic, to keep Claude API spend intentional.
-- **Text only, not vision**: the Ad Library API's `ArchivedAd` object has no direct image/video URL field
-  (only `ad_snapshot_url`, a link to Meta's own HTML preview page) — so analysis works from ad copy text
-  only. `ad_snapshot_url` is surfaced as a "view original ad" link. Real visual analysis is a future
-  enhancement, not built here.
-- **Claude integration** (`infrastructure/claude-analysis-client.ts`): uses `client.messages.parse()` with
-  `zodOutputFormat()` for guaranteed structured output (messaging angle, hook, tone, target audience, CTA,
-  summary) — no manual JSON parsing. Model is `claude-opus-5`.
+- **Ingestion is paginated and capped, not single-page**: `infrastructure/meta-ad-library-client.ts`
+  follows `paging.next` up to `MAX_PAGES` (5) per call, sharing its HTTP plumbing (JSON-vs-HTML handling,
+  rate-limit classification) with `creative-intelligence`'s Graph client via `src/lib/meta/graph-http.ts` —
+  the same "Meta sometimes answers with HTML instead of JSON" fix, paid for once. Adding a competitor
+  (name + numeric Meta Page ID) still fetches immediately, and a "Refresh ads" button re-fetches on
+  demand; a scheduled cron (below) also runs it periodically.
+- **First/last seen and active status are tracked, not overwritten away**: `competitor_ads` gained
+  `ad_delivery_stop_time`, `is_active` (derived: no stop time), `first_seen_at`, and `last_seen_at`.
+  `upsertAds` only updates `last_seen_at`/`is_active`/`ad_delivery_stop_time` on conflict — `first_seen_at`
+  is set once and never touched again, so "how long has this angle been running" is answerable instead of
+  being reset by every refresh.
+- **Competitor Creative DNA replaces the old flat text analysis.** `domain/competitor-dna.ts` imports the
+  same closed vocabularies `creative-intelligence` uses for the user's own creatives (`hook_type`, `angle`,
+  `awareness_level`, `offer_type`, `offer_strength`, `emotional_driver`) plus one competitor-only field,
+  `cta_style` — sharing the vocabulary is what makes "competitors lean on price, our winners lean on
+  outcome" a group-by instead of two incomparable piles of free text (which is what the old
+  `messaging_angle`/`hook`/`tone`/`target_audience`/`call_to_action`/`summary` schema in `ad_analyses` was).
+  Stored in the new `competitor_creative_features` table.
+- **Text only, still not vision**: the Ad Library API's `ArchivedAd` object has no direct image/video URL
+  field (only `ad_snapshot_url`, a link to Meta's own HTML preview page), so DNA is read from ad copy text
+  only — every visual field `creative_features` has (composition, visual pattern, brightness, ...) is
+  intentionally absent from the competitor schema rather than nulled out, to say "not available in Phase
+  1" rather than "tried and failed." `ad_snapshot_url` is still surfaced as a "view original ad" link.
+- **Observed facts and inferred hypotheses are kept separate, and confidence is computed, not
+  self-reported.** `observed_facts`/`inferred_hypotheses` (both text arrays) distinguish what's literally
+  quotable in the copy from the model's hedged reasoning about strategy. `confidence` (low/medium/high) is
+  a deterministic function of word count (`competitorConfidenceFor` in `domain/competitor-dna.ts`), the
+  same philosophy as `evidence_tier` in `creative-intelligence`'s scoring: a fact about the input, never
+  the model's opinion of its own output. Neither list may claim anything about competitor performance —
+  the Ad Library gives no spend/CPA/ROAS, so there is nothing to base a performance claim on.
+- **Claude integration** (`infrastructure/competitor-dna-client.ts`): `client.messages.parse()` +
+  `zodOutputFormat()`, `effort: "medium"`, same structured-output pattern as everywhere else in this app.
+  Analysis runs are cached in the shared `analysis_runs` table (`analysis_type: 'competitor_dna'`, keyed on
+  a content hash of the ad copy) — re-analysing unchanged copy is never paid for twice. This replaced the
+  old `infrastructure/claude-analysis-client.ts`, which is deleted; `ad_analyses` and its rows are left in
+  place unmigrated (too little real data to justify a migration), and `AdCard` renders the new DNA when
+  present, falling back to the legacy flat analysis only for ads analysed before this change.
+- **Suggested competitors are a review queue, never auto-promoted.** `suggested_competitors` holds a
+  flagged name/reason (Meta Page ID optional, since a flag may predate knowing it) with
+  `status: pending | approved | dismissed`. Approving one inserts into `competitors` with
+  `discovery_source: 'suggested'` and immediately fetches its ads; nothing reaches `competitors` without
+  that explicit click. Phase 1 only supports manually flagging a suspected competitor
+  (`source: 'manual_search'`) — algorithmic discovery (searching the Ad Library by keyword/category) is a
+  larger, separate feature deferred to a later phase.
+- **A scheduled job now exists** (`src/app/api/jobs/competitor-research/route.ts`, `vercel.json` cron at
+  05:00 UTC daily, staggered an hour after `sync-performance`'s 04:00 run so they don't compete for the
+  same Meta rate-limit window): refreshes each active competitor's ads and reads DNA for whatever is new,
+  capped at 10 new analyses per competitor per run. Structurally a copy of `sync-performance/route.ts`'s
+  budgeting — `CRON_SECRET`-gated, service-role client, time-sliced across users rather than exhaustive,
+  grouped by user because the `job_runs` single-flight claim is per `(user_id, job_name)` with
+  `job_name: 'competitor_research'`. Sequential per competitor within a user, same reasoning as
+  `sync-performance`: Meta rate-limits per app, and firing every competitor at once is the fastest way to
+  get throttled for all of them.
 - **Secrets**: `ANTHROPIC_API_KEY` and `META_AD_LIBRARY_ACCESS_TOKEN` live in `src/lib/env.ts`'s server
-  schema only — never exposed to the client.
+  schema only — never exposed to the client. No new secrets were needed for this upgrade.
 - RLS scopes `competitors` → `competitor_ads` → `ad_analyses` back to `auth.uid()` through
-  `competitors.user_id`, so a user only ever sees their own tracked competitors.
+  `competitors.user_id`. `competitor_creative_features` and `suggested_competitors` denormalize `user_id`
+  directly (same reasoning as `creative_features`) so `market-intelligence`'s whitespace read doesn't need
+  a join back through two tables to enforce RLS.
 - **Meta requires identity verification for Ad Library API access** — confirmed empirically, not
   documented on the `ads_archive` reference page. A bare App Access Token (`{id}|{secret}`) is rejected
   with `error_subcode 2332004` ("App role required"); a User Access Token from the app's own Admin gets
   further but still fails with `error_subcode 2332002` ("Authorization and login needed... follow the
   steps at facebook.com/ads/library/api") until that Facebook account has completed Meta's identity
   confirmation process. This is a one-time step on the token owner's Facebook account, not something the
-  app can do programmatically — do this before expecting real ad data to return.
+  app can do programmatically — do this before expecting real ad data to return, including from the new
+  cron job above.
+
+## Market intelligence (whitespace synthesis)
+
+`src/features/market-intelligence` compares `creative-intelligence`'s `creative_features` (our winners)
+against `competitor-analysis`'s `competitor_creative_features` (their ads) on the shared closed vocabulary,
+and is the first feature that reads both other features' tables directly rather than owning either —
+neither "our performance" nor "their ads," but the comparison between them:
+
+- **The aggregation is pure and computed on every read**, not stored: `domain/whitespace-analysis.ts`'s
+  `computeWhitespace()` groups both sides by `hook_type`/`angle`/`offer_type`/`emotional_driver`, computes
+  each side's distribution, and buckets each value into `sharedPatterns` (both sides cluster near the same
+  rate), `competitorLeaning` (they lead by ≥15 points), or `whitespace` (we lead by ≥15 points and they're
+  near-absent). Cheap enough — tens to low hundreds of rows per user — to run on every dashboard load
+  rather than needing a stored table; a category is skipped entirely below a 5-row minimum sample on
+  either side, so a handful of creatives can't be read as a pattern.
+- **Only the narrative bullets are cached, not the aggregation.** `infrastructure/whitespace-narrative-client.ts`
+  turns the pre-computed diff into 3-5 short observations via Claude (`client.messages.parse()` +
+  `zodOutputFormat()`) — it never receives raw ad copy, only the aggregated percentages, so it cannot
+  invent a pattern the aggregation didn't find. Cached in `analysis_runs`
+  (`analysis_type: 'whitespace'`, keyed on a hash of the aggregated counts) and refreshed only on an
+  explicit "Refresh market analysis" click, deliberately not on the competitor-research cron — a page
+  render must never trigger a paid Claude call, and coupling the narrative to every scheduled competitor
+  refresh would re-bill Claude even when nothing meaningful changed.
+- **Labelled as observations, not recommendations**, throughout the UI: this is Phase 1 (Intelligence)
+  describing a pattern, not Phase 2 (Creative Factory) proposing a test — the prompt explicitly instructs
+  Claude not to phrase output as a recommendation.
+- Composed into `/dashboard/intelligence/creative-factory`, the Phase 1 dashboard that shows our winners,
+  competitor patterns, and this whitespace comparison together — a leaf under the existing "Intelligence"
+  nav group rather than a new top-level one, since it reads what Intelligence already computes and a
+  single-page group would be premature until later phases add more pages under it.
 
 ## Ad concept generation
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchAdAccounts,
   fetchPages,
+  MetaGraphError,
 } from "@/features/creative-intelligence/infrastructure/meta-graph-client";
 
 /**
@@ -10,12 +11,31 @@ import {
  * token cannot read fails the entire call rather than omitting that field.
  */
 
-function stubFetch(handler: (url: string) => unknown) {
-  const spy = vi.fn(async (input: RequestInfo | URL) => ({
-    ok: true,
-    status: 200,
-    json: async () => handler(String(input)),
-  }));
+/**
+ * A stubbed fetch that answers with a body the client reads the way it reads a
+ * real Response.
+ *
+ * `text()` rather than `json()`, because that is what the client calls: Meta
+ * does not always answer with JSON, and a stub that can only produce parsed
+ * objects cannot express the HTML error page that broke a live sync. Serialising
+ * here keeps the stub honest — the client does its own parsing, as it must.
+ */
+function stubFetch(
+  handler: (url: string) => unknown,
+  init: { ok?: boolean; status?: number; contentType?: string } = {},
+) {
+  const spy = vi.fn(async (input: RequestInfo | URL) => {
+    const body = handler(String(input));
+    return {
+      ok: init.ok ?? true,
+      status: init.status ?? 200,
+      headers: new Headers({
+        "content-type": init.contentType ?? "application/json",
+      }),
+      text: async () =>
+        typeof body === "string" ? body : JSON.stringify(body),
+    };
+  });
   vi.stubGlobal("fetch", spy);
   return spy;
 }
@@ -123,5 +143,42 @@ describe("fetchPages", () => {
     stubFetch(() => ({ data: [] }));
 
     expect((await fetchPages("token")).items).toEqual([]);
+  });
+});
+
+describe("a non-JSON answer", () => {
+  /**
+   * Meta answered a live sync with an HTML gateway page. `response.json()`
+   * threw a bare `SyntaxError: Unexpected token '<'` that named no account, no
+   * path and no status; because it was not a MetaGraphError, `isRetryable()`
+   * said no and one bad response aborted a walk over thirty accounts.
+   */
+  it("is reported as a Meta error naming the status and the path", async () => {
+    stubFetch(() => "<!DOCTYPE html><html><body>Bad gateway</body></html>", {
+      ok: false,
+      status: 502,
+      contentType: "text/html",
+    });
+
+    const error = await fetchAdAccounts("token").catch((e) => e);
+
+    expect(error).toBeInstanceOf(MetaGraphError);
+    expect(error.message).toContain("502");
+    expect(error.message).toContain("text/html");
+    // A gateway error is transient, so the sync is allowed to come back.
+    expect(error.isRateLimit).toBe(true);
+  });
+
+  it("does not invite a retry when the status is a client error", async () => {
+    stubFetch(() => "<html>Forbidden</html>", {
+      ok: false,
+      status: 403,
+      contentType: "text/html",
+    });
+
+    const error = await fetchAdAccounts("token").catch((e) => e);
+
+    expect(error).toBeInstanceOf(MetaGraphError);
+    expect(error.isRateLimit).toBe(false);
   });
 });

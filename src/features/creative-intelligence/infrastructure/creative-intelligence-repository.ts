@@ -33,6 +33,56 @@ export type Db = SupabaseClient<Database>;
 const PAGE_SIZE = 1000;
 
 /**
+ * Reads every row a query matches, not the first thousand.
+ *
+ * PostgREST answers an unbounded select with 1000 rows and no error, no
+ * warning, and no indication that anything was left behind. In a subsystem
+ * whose entire job is measurement that is the most expensive failure available:
+ * the numbers stay plausible while being wrong. It had already cost us 86% of
+ * the revenue data — 6,918 ads were mirrored, the ad→row map held 1,000 of
+ * them, and the insights phase discarded every fact whose ad fell outside that
+ * arbitrary thousand as "not mirrored yet".
+ *
+ * Every read here that can match more than a thousand rows goes through this,
+ * so there is one place to be right rather than six places to forget.
+ *
+ * Callers must order by something unique (append `id`): paging an unstable sort
+ * repeats some rows and skips others, which would trade a visible truncation
+ * for an invisible corruption.
+ */
+async function fetchAllRows<Row>(query: {
+  range: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+}): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
+/**
+ * How many ids to ask for in one `in(...)` filter.
+ *
+ * Bounded because the filter travels in the URL and a few thousand ids exceeds
+ * what proxies will carry.
+ */
+const ID_CHUNK = 300;
+
+function chunked<T>(values: T[], size = ID_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < values.length; i += size)
+    out.push(values.slice(i, i + size));
+  return out;
+}
+
+/**
  * Scopes a query to one user when the caller supplied an id.
  *
  * Interactive calls omit it and lean on RLS. Scheduled jobs run as service
@@ -157,36 +207,68 @@ export async function listAdEntities(
   db?: Db,
 ): Promise<MetaAdEntityRow[]> {
   const supabase = await resolve(db);
-  const { data, error } = await scopedToUser(
-    supabase
-      .from("meta_ad_entities")
-      .select(
-        "id, entity_type, meta_id, parent_meta_id, name, status, effective_status, creative_meta_id, thumbnail_url, perceptual_hash",
-      )
-      .eq("entity_type", "ad"),
-    userId,
-  ).order("name", { ascending: true });
-
-  if (error) throw error;
-  return data;
+  // Paged, and ordered by id as well as name: attribution and scoring both walk
+  // this list, and handing them the first 1000 of 6,918 ads would quietly
+  // exclude most of the account from every ranking it feeds.
+  return fetchAllRows<MetaAdEntityRow>(
+    scopedToUser(
+      supabase
+        .from("meta_ad_entities")
+        .select(
+          "id, entity_type, meta_id, parent_meta_id, name, status, effective_status, creative_meta_id, thumbnail_url, perceptual_hash",
+        )
+        .eq("entity_type", "ad"),
+      userId,
+    )
+      .order("name", { ascending: true })
+      .order("id", { ascending: true }),
+  );
 }
 
-/** Meta ad id → our row id, for keying insights without a second round trip. */
+/**
+ * Meta ad id → our row id, for keying insights without a second round trip.
+ *
+ * Pass the ids you actually need. The caller has a page of insights in hand and
+ * wants those ads, so asking for exactly those is both correct and a great deal
+ * cheaper than dragging the whole ad table across the wire on every page — this
+ * runs once per insights page.
+ *
+ * Omitting them returns the full map, paged. That path exists for callers who
+ * genuinely need every ad; it must never silently return part of one.
+ */
 export async function mapMetaAdIdsToEntityIds(
   userId?: string,
   db?: Db,
+  metaAdIds?: string[],
 ): Promise<Map<string, string>> {
   const supabase = await resolve(db);
-  const { data, error } = await scopedToUser(
-    supabase
-      .from("meta_ad_entities")
-      .select("id, meta_id")
-      .eq("entity_type", "ad"),
-    userId,
-  );
 
-  if (error) throw error;
-  return new Map(data.map((row) => [row.meta_id, row.id]));
+  const select = () =>
+    scopedToUser(
+      supabase
+        .from("meta_ad_entities")
+        .select("id, meta_id")
+        .eq("entity_type", "ad"),
+      userId,
+    );
+
+  if (metaAdIds) {
+    if (metaAdIds.length === 0) return new Map();
+    const map = new Map<string, string>();
+    // Chunked rather than one filter: a page of insights can name more ids
+    // than a URL will carry.
+    for (const chunk of chunked([...new Set(metaAdIds)])) {
+      const { data, error } = await select().in("meta_id", chunk);
+      if (error) throw error;
+      for (const row of data) map.set(row.meta_id, row.id);
+    }
+    return map;
+  }
+
+  const rows = await fetchAllRows<{ id: string; meta_id: string }>(
+    select().order("id", { ascending: true }),
+  );
+  return new Map(rows.map((row) => [row.meta_id, row.id]));
 }
 
 /** Ads we could fingerprint but have not yet. */
@@ -587,22 +669,41 @@ export async function upsertCreativeMetrics(
  * rollup, never the daily facts, which is what keeps a page render cheap at a
  * million creatives.
  */
-export async function listScoredCreatives(windowDays = 30): Promise<
+export async function listScoredCreatives(
+  windowDays = 30,
+  /**
+   * Explicit tenant scope for callers with no session to rely on (the Hermes
+   * MCP gateway, which authenticates by bearer token, not a Supabase
+   * session). Omit for normal Server Component/Action use, where RLS on the
+   * session client already does the scoping — passing `db` without `userId`
+   * would leak every tenant's rows to whichever caller has the admin client.
+   */
+  userId?: string,
+  db?: Db,
+): Promise<
   (CreativeMetricRow & {
     concept_headline: string | null;
     ad_name: string | null;
   })[]
 > {
-  const supabase = await resolve();
-  const { data, error } = await supabase
-    .from("creative_metrics")
-    .select(
-      "id, concept_id, meta_entity_id, window_days, impressions, clicks, link_clicks, spend, purchases, revenue, ctr, ctr_lower_bound, cpc, cpm, cpa, roas, roas_shrunk, composite_score, primary_metric, evidence_tier, percentile_rank, computed_at, ad_concepts(headline), meta_ad_entities(name)",
+  const supabase = await resolve(db);
+  // Paged, with id as the tiebreaker. Scores tie and can be null, so ordering
+  // on score alone is not a stable sequence — paging it would repeat some rows
+  // and skip others. There are already 1,054 scored creatives, so the
+  // unbounded version was dropping the tail of the ranking outright.
+  const data = await fetchAllRows(
+    scopedToUser(
+      supabase
+        .from("creative_metrics")
+        .select(
+          "id, concept_id, meta_entity_id, window_days, impressions, clicks, link_clicks, spend, purchases, revenue, ctr, ctr_lower_bound, cpc, cpm, cpa, roas, roas_shrunk, composite_score, primary_metric, evidence_tier, percentile_rank, computed_at, ad_concepts(headline), meta_ad_entities(name)",
+        )
+        .eq("window_days", windowDays),
+      userId,
     )
-    .eq("window_days", windowDays)
-    .order("composite_score", { ascending: false, nullsFirst: false });
-
-  if (error) throw error;
+      .order("composite_score", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true }),
+  );
 
   // Evidence outranks score. The domain already refuses to rank an
   // `insufficient` creative — percentileRanks drops them — but the table was
@@ -1154,13 +1255,16 @@ export async function listAnalysedEntityIds(
   db?: Db,
 ): Promise<Set<string>> {
   const supabase = await resolve(db);
-  const { data, error } = await supabase
-    .from("creative_features")
-    .select("meta_entity_id, content_hash")
-    .eq("user_id", userId);
-
-  if (error) throw error;
-  return new Set((data ?? []).map((row) => row.meta_entity_id));
+  // Paged: this decides what a run skips, so a truncated read would re-analyse
+  // — and re-pay for — creatives that already have DNA.
+  const rows = await fetchAllRows(
+    supabase
+      .from("creative_features")
+      .select("meta_entity_id, content_hash")
+      .eq("user_id", userId)
+      .order("meta_entity_id", { ascending: true }),
+  );
+  return new Set(rows.map((row) => row.meta_entity_id));
 }
 
 export async function recordAnalysisRun(
@@ -1255,21 +1359,30 @@ export async function upsertCreativeFeatures(
 export async function listCreativeFeatures(
   adAccountIds: string[],
   db?: Db,
+  /** See listScoredCreatives — required alongside `db` for session-less callers. */
+  userId?: string,
 ): Promise<(CreativeFeatureRow & { ad_name: string | null })[]> {
   if (adAccountIds.length === 0) return [];
 
   const supabase = await resolve(db);
-  const { data, error } = await supabase
-    .from("creative_features")
-    .select(
-      "id, meta_entity_id, hook_type, hook_text, angle, awareness_level, offer_type, offer_strength, emotional_driver, format, composition, visual_pattern, has_person, shows_product, text_on_image, proof_type, brightness, why_it_works, created_at, meta_ad_entities(name, ad_account_id)",
+  // Paged, and with id breaking ties: the account filter below runs in memory,
+  // so a truncated read would drop analysed creatives from the tallies without
+  // any sign that it had.
+  const data = await fetchAllRows(
+    scopedToUser(
+      supabase
+        .from("creative_features")
+        .select(
+          "id, meta_entity_id, hook_type, hook_text, angle, awareness_level, offer_type, offer_strength, emotional_driver, format, composition, visual_pattern, has_person, shows_product, text_on_image, proof_type, brightness, why_it_works, created_at, meta_ad_entities(name, ad_account_id)",
+        ),
+      userId,
     )
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true }),
+  );
 
   return (
-    (data ?? [])
+    data
       .map((row) => {
         const entity = row.meta_ad_entities as unknown as {
           name: string;

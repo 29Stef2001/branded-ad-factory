@@ -12,8 +12,11 @@ import { env } from "@/lib/env";
  *
  * Rules for using this:
  *
- * - Only from `src/app/api/jobs/**`. Never from a page, a Server Action, or
- *   anything a request with a user session can reach.
+ * - Only from `src/app/api/jobs/**` or `src/app/api/mcp/**` — the two places
+ *   a request genuinely has no Supabase session (cron has no cookies, and
+ *   the Hermes MCP gateway authenticates by bearer token instead of one).
+ *   Never from a page, a Server Action, or anything a request with a user
+ *   session can reach.
  * - Always scope queries by `user_id` by hand. RLS is not there to catch a
  *   missing filter any more, so a forgotten `.eq("user_id", …)` silently reads
  *   or writes across every account.
@@ -42,4 +45,13 @@ export function createAdminClient() {
 /** True when scheduled jobs are configured to run at all. */
 export function canRunScheduledJobs(): boolean {
   return Boolean(env.SUPABASE_SERVICE_ROLE_KEY && env.CRON_SECRET);
+}
+
+/** True when the Hermes MCP gateway is configured to run at all. */
+export function canRunHermesGateway(): boolean {
+  return Boolean(
+    env.SUPABASE_SERVICE_ROLE_KEY &&
+      env.HERMES_MCP_TOKEN &&
+      env.HERMES_MCP_USER_ID,
+  );
 }

@@ -2,11 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { addCompetitorSchema } from "@/features/competitor-analysis/domain/schemas";
-import { fetchActiveAdsForPage } from "@/features/competitor-analysis/infrastructure/meta-ad-library-client";
-import {
-  createCompetitor,
-  upsertAds,
-} from "@/features/competitor-analysis/infrastructure/competitor-repository";
+import { createCompetitor } from "@/features/competitor-analysis/infrastructure/competitor-repository";
+import { researchCompetitorAds } from "@/features/competitor-analysis/application/research-competitor";
 import { getCurrentUser } from "@/features/auth/infrastructure/auth-repository";
 import type { ActionState } from "@/features/competitor-analysis/application/types";
 
@@ -28,25 +25,21 @@ export async function addCompetitorAction(
     return { status: "error", message: "You must be signed in." };
   }
 
-  let ads;
-  try {
-    ads = await fetchActiveAdsForPage(parsed.data.metaPageId);
-  } catch (error) {
-    return {
-      status: "error",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch ads from Meta.",
-    };
-  }
-
   const competitor = await createCompetitor(
     user.id,
     parsed.data.name,
     parsed.data.metaPageId,
   );
-  await upsertAds(competitor.id, ads);
+
+  // Tracking the competitor never depends on a provider actually finding
+  // ads: most ordinary commercial competitors are outside Meta Ad Library's
+  // scope by design, and no provider being available yet is a normal state,
+  // not a failure — see researchCompetitorAds.
+  await researchCompetitorAds(competitor.id, {
+    name: parsed.data.name,
+    metaPageId: parsed.data.metaPageId,
+    websiteUrl: null,
+  }).catch(() => null);
 
   redirect(`/dashboard/competitors/${competitor.id}`);
 }

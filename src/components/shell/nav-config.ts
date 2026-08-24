@@ -87,6 +87,14 @@ export const NAV_TREE: NavEntry[] = [
         label: "Attribution",
         segment: "intelligence/attribution",
       },
+      {
+        // Phase 1's composed view: our winners next to competitor patterns
+        // and the whitespace between them. A leaf here rather than its own
+        // top-level group — it reads what Intelligence already computes, and
+        // a single-page group would be sprawl until later phases add more.
+        label: "Creative Factory",
+        segment: "intelligence/creative-factory",
+      },
     ],
   },
   {

@@ -3,6 +3,14 @@ import {
   type DailyInsight,
   type MetaInsightRow,
 } from "@/features/creative-intelligence/domain/meta-metrics";
+import {
+  GRAPH_BASE,
+  MetaApiError,
+  graphGet,
+  pageOf,
+  type Page,
+  type Paged,
+} from "@/lib/meta/graph-http";
 
 /**
  * Meta Graph reads for Creative Intelligence.
@@ -15,10 +23,12 @@ import {
  * resumable job impossible to write.
  *
  * Only `ads_read` is needed for any of this.
+ *
+ * The HTTP plumbing (JSON-vs-HTML handling, rate-limit/token-error
+ * classification) lives in `@/lib/meta/graph-http`, shared with
+ * competitor-analysis's Ad Library client — see that module for why reading
+ * the response as text first matters.
  */
-
-const GRAPH_API_VERSION = "v25.0";
-const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 /** Meta's cap is 500; 200 keeps a page comfortably inside the time budget. */
 const PAGE_SIZE = 200;
@@ -35,64 +45,10 @@ export type MetaEntity = {
   thumbnailUrl: string | null;
 };
 
-export type Page<T> = {
-  items: T[];
-  /** Pass back as `after` to continue. Null when the last page was reached. */
-  nextCursor: string | null;
-};
+export type { Page };
 
-export class MetaGraphError extends Error {
-  constructor(
-    message: string,
-    readonly code: number | null,
-    readonly isRateLimit: boolean,
-    readonly isTokenError: boolean,
-  ) {
-    super(message);
-    this.name = "MetaGraphError";
-  }
-}
-
-/** Throttling codes. Meta wants a pause, not a retry storm. */
-const RATE_LIMIT_CODES = new Set([4, 17, 32, 613, 80000, 80004]);
-/** The token is gone or was revoked — retrying will never help. */
-const TOKEN_ERROR_CODES = new Set([190, 102, 463, 467]);
-
-async function graphGet<T>(
-  path: string,
-  params: Record<string, string>,
-  accessToken: string,
-): Promise<T> {
-  const search = new URLSearchParams({ ...params, access_token: accessToken });
-  const response = await fetch(`${GRAPH_BASE}/${path}?${search.toString()}`);
-  const body = await response.json();
-
-  if (!response.ok || body.error) {
-    const code = body.error?.code ?? null;
-    throw new MetaGraphError(
-      body.error?.message ?? `Meta request failed (HTTP ${response.status}).`,
-      code,
-      RATE_LIMIT_CODES.has(code),
-      TOKEN_ERROR_CODES.has(code),
-    );
-  }
-
-  return body as T;
-}
-
-type Paged<T> = {
-  data: T[];
-  paging?: { cursors?: { after?: string }; next?: string };
-};
-
-function pageOf<T, R>(body: Paged<T>, map: (item: T) => R): Page<R> {
-  return {
-    items: body.data.map(map),
-    // `next` is what says another page exists; a cursor alone is returned even
-    // on the final page, so keying off it would loop forever.
-    nextCursor: body.paging?.next ? (body.paging.cursors?.after ?? null) : null,
-  };
-}
+/** Kept as the name every existing caller and `instanceof` check uses. */
+export { MetaApiError as MetaGraphError };
 
 type RawCampaign = {
   id: string;

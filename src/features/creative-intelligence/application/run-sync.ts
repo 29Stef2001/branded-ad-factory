@@ -25,12 +25,33 @@ import type { ActionState } from "@/features/ad-concepts/application/types";
 
 const JOB_NAME = "meta_sync";
 
+/**
+ * Names the accounts a pass could not read.
+ *
+ * Skipping is the right behaviour — one inaccessible account must not stall the
+ * other twenty-nine — but a skip that says nothing is indistinguishable from an
+ * account with no ads, which is exactly the confusion that hid a missing
+ * $25,000 of revenue. So the reason travels with the result.
+ */
+function skippedNote(skipped: { adAccountId: string; reason: string }[] = []) {
+  if (skipped.length === 0) return "";
+  const named = skipped
+    .slice(0, 3)
+    .map((entry) => `${entry.adAccountId} (${entry.reason})`)
+    .join("; ");
+  return ` Skipped ${skipped.length} account${skipped.length === 1 ? "" : "s"}: ${named}${
+    skipped.length > 3 ? `; and ${skipped.length - 3} more` : ""
+  }.`;
+}
+
 export type SyncOutcome = {
   status: "completed" | "partial" | "skipped" | "failed";
   processed: number;
   attributed?: number;
   scored?: number;
   hashed?: number;
+  /** Accounts this pass could not read, and why. Empty is the happy case. */
+  skipped?: { adAccountId: string; reason: string }[];
   message: string;
 };
 
@@ -113,9 +134,11 @@ export async function runSyncPass(
         processed: step.processed,
         attributed: partialAttribution.autoConfirmed,
         scored: partialScoring.scored,
+        skipped: step.skipped,
         message:
           `Synced ${step.processed} rows and scored ${partialScoring.scored} creatives so far. ` +
-          `More to fetch — the next run resumes from here.`,
+          `More to fetch — the next run resumes from here.` +
+          skippedNote(step.skipped),
       };
     }
 
@@ -144,6 +167,7 @@ export async function runSyncPass(
       attributed: attribution.autoConfirmed,
       scored: scoring.scored,
       hashed: hashing.hashed,
+      skipped: step.skipped,
       message:
         `Synced ${step.processed} rows across ${accountIds.length || 1} account${accountIds.length === 1 ? "" : "s"}, ` +
         `scored ${scoring.scored} creatives. ` +
@@ -155,7 +179,8 @@ export async function runSyncPass(
           : "") +
         (hashing.hashed > 0
           ? ` Fingerprinted ${hashing.hashed} thumbnail${hashing.hashed === 1 ? "" : "s"}${hashing.remaining ? " (more next run)" : ""}.`
-          : ""),
+          : "") +
+        skippedNote(step.skipped),
     };
   } catch (error) {
     const message =

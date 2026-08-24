@@ -3,11 +3,11 @@
 import { useActionState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { analyzeAdAction } from "@/features/competitor-analysis/application/analyze-ad";
+import { analyseCompetitorAdDnaAction } from "@/features/competitor-analysis/application/analyse-competitor-dna";
 import { initialActionState } from "@/features/competitor-analysis/application/types";
 
 export function AnalyzeButton({ adId }: { adId: string }) {
-  const analyzeWithId = analyzeAdAction.bind(null, adId);
+  const analyzeWithId = analyseCompetitorAdDnaAction.bind(null, adId);
   const [state, formAction, isPending] = useActionState(
     analyzeWithId,
     initialActionState,
