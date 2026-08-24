@@ -8,6 +8,7 @@ import { env } from "@/lib/env";
 import { createAdminClient, canRunHermesGateway } from "@/lib/supabase/admin";
 import {
   approvalGetStatusInput,
+  competitorAdsSubmitInput,
   competitorDiscoverInput,
   competitorGetCreativeDnaInput,
   competitorGetWhitespaceInput,
@@ -18,6 +19,7 @@ import {
 } from "@/features/hermes-gateway/domain/tool-schemas";
 import {
   approvalGetStatus,
+  competitorAdsSubmit,
   competitorGetCreativeDna,
   competitorGetWhitespace,
   competitorList,
@@ -30,8 +32,12 @@ import { competitorDiscover } from "@/features/hermes-gateway/application/compet
 
 /**
  * The Hermes Agent MCP gateway — read-only Creative Factory intelligence,
- * plus the one write path (`competitor_discover`) that only ever proposes
- * candidates for human review, never commits them.
+ * plus two write paths: `competitor_discover` (only ever proposes candidates
+ * for human review, never commits them) and `competitor_ads_submit` (ads
+ * Hermes itself observed via its own browser automation — e.g. browsing
+ * Meta's public Ad Library website or a competitor's site directly — which
+ * this app never fetches server-side; see that tool's module comment in
+ * hermes-gateway/application/tools.ts for why that split matters).
  *
  * Nothing here duplicates business logic: every tool is a call into the same
  * application-layer functions the web app's Server Actions call. This route
@@ -210,6 +216,27 @@ const handler = createMcpHandler((server) => {
       const db = createAdminClient();
       try {
         return textResult(await competitorResearch(input, userId, db));
+      } catch (error) {
+        return errorResult(
+          error instanceof Error ? error.message : "Unknown error.",
+        );
+      }
+    },
+  );
+
+  server.registerTool(
+    "competitor_ads_submit",
+    {
+      title: "Competitor Ads Submit",
+      description:
+        "Records ads YOU (Hermes) observed directly — via your own browser automation, e.g. browsing Meta's public Ad Library website or a competitor's own site. This app never fetches arbitrary URLs server-side, so this is how ads you find get into the same pipeline the other providers feed: deduplicated, and automatically read for Creative DNA (hook, angle, offer, CTA) afterward. The competitor must already be tracked — use competitor_list or competitor_discover first. Report only what a page actually showed you; leave a field out rather than guessing.",
+      inputSchema: competitorAdsSubmitInput,
+    },
+    async (input, ctx) => {
+      const userId = ctx.http?.authInfo?.extra?.userId as string;
+      const db = createAdminClient();
+      try {
+        return textResult(await competitorAdsSubmit(input, userId, db));
       } catch (error) {
         return errorResult(
           error instanceof Error ? error.message : "Unknown error.",

@@ -17,7 +17,13 @@ export type ProviderId =
   | "meta_ad_library"
   | "public_web_research"
   | "external_ad_intelligence"
-  | "future_scraper";
+  | "future_scraper"
+  // Ads Hermes itself observed via its own browser automation and reported
+  // back through the `competitor_ads_submit` MCP tool — not a
+  // CompetitorDataProvider implementation (nothing here calls out to fetch
+  // anything), just the correct provenance label for where these rows came
+  // from. See src/features/hermes-gateway/application/tools.ts.
+  | "hermes_research";
 
 /**
  * - `ok`: the provider ran and returned what it found (possibly zero ads —
