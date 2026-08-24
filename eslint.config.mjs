@@ -19,6 +19,10 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Verification builds, kept out of .next so they cannot disturb the dev
+    // server. Build output is minified and linting it reports thousands of
+    // findings about code nobody wrote.
+    ".next-verify/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
