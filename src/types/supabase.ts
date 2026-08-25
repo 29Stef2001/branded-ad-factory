@@ -2080,7 +2080,7 @@ export type Database = {
           discovery_source: string
           id: string
           last_synced_at: string | null
-          meta_page_id: string
+          meta_page_id: string | null
           name: string
           status: string
           user_id: string
@@ -2091,7 +2091,7 @@ export type Database = {
           discovery_source?: string
           id?: string
           last_synced_at?: string | null
-          meta_page_id: string
+          meta_page_id?: string | null
           name: string
           status?: string
           user_id: string
@@ -2102,7 +2102,7 @@ export type Database = {
           discovery_source?: string
           id?: string
           last_synced_at?: string | null
-          meta_page_id?: string
+          meta_page_id?: string | null
           name?: string
           status?: string
           user_id?: string

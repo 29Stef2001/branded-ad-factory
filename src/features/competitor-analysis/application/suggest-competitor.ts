@@ -61,18 +61,26 @@ export async function approveSuggestedCompetitorAction(
   if (!suggestion) {
     return { status: "error", message: "Suggestion not found." };
   }
-  if (!suggestion.meta_page_id) {
+  // A website is enough. This used to demand a Meta Page ID, which made every
+  // automatically discovered candidate un-approvable: discovery yields a name
+  // and a website, because a model cannot reliably know a numeric Page ID.
+  // Ads no longer arrive only through the Meta Ad Library API, so the Page ID
+  // is one way to identify a competitor rather than the only one.
+  if (!suggestion.meta_page_id && !suggestion.website_url) {
     return {
       status: "error",
       message:
-        "This suggestion has no Meta Page ID yet — dismiss it and add the competitor manually once you have one.",
+        "This suggestion has neither a website nor a Meta Page ID, so there is nothing to research. Dismiss it and add the competitor manually.",
     };
   }
 
   const competitor = await createCompetitor(
     userId,
     suggestion.name,
-    suggestion.meta_page_id,
+    {
+      metaPageId: suggestion.meta_page_id,
+      websiteUrl: suggestion.website_url,
+    },
     "suggested",
   );
 
@@ -81,7 +89,7 @@ export async function approveSuggestedCompetitorAction(
   await researchCompetitorAds(competitor.id, {
     name: suggestion.name,
     metaPageId: suggestion.meta_page_id,
-    websiteUrl: null,
+    websiteUrl: suggestion.website_url,
   }).catch(() => null);
 
   await updateSuggestedCompetitorStatus(suggestionId, "approved");

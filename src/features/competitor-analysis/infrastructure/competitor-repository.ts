@@ -94,12 +94,31 @@ export type CompetitorAdWithAnalysis = Pick<
   > | null;
 };
 
+/**
+ * Tracks a competitor.
+ *
+ * Both identifiers are optional individually but not together — a competitor
+ * with neither a Meta Page ID nor a website is a name with nothing any
+ * provider or research pass could act on. The Page ID stopped being required
+ * once ads began arriving from sources other than the Meta Ad Library API
+ * (see the migration that relaxed the column): automated discovery yields a
+ * website, and `competitor_ads_submit` identifies ads by what Hermes
+ * actually saw, not by a numeric Page ID.
+ */
 export async function createCompetitor(
   userId: string,
   name: string,
-  metaPageId: string,
+  identifiers: { metaPageId?: string | null; websiteUrl?: string | null },
   discoverySource: "manual" | "suggested" = "manual",
 ) {
+  const metaPageId = identifiers.metaPageId ?? null;
+  const websiteUrl = identifiers.websiteUrl ?? null;
+  if (!metaPageId && !websiteUrl) {
+    throw new Error(
+      "A competitor needs either a Meta Page ID or a website — with neither there is nothing to research.",
+    );
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("competitors")
@@ -107,6 +126,7 @@ export async function createCompetitor(
       user_id: userId,
       name,
       meta_page_id: metaPageId,
+      website_url: websiteUrl,
       discovery_source: discoverySource,
     })
     .select("id")
@@ -539,12 +559,12 @@ export async function getSuggestedCompetitor(
   id: string,
 ): Promise<Pick<
   Tables<"suggested_competitors">,
-  "id" | "name" | "meta_page_id" | "status"
+  "id" | "name" | "meta_page_id" | "website_url" | "status"
 > | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("suggested_competitors")
-    .select("id, name, meta_page_id, status")
+    .select("id, name, meta_page_id, website_url, status")
     .eq("id", id)
     .maybeSingle();
 

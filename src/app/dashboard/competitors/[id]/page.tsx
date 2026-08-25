@@ -40,7 +40,9 @@ export default async function CompetitorDetailPage({
             {competitor.name}
           </h1>
           <p className="text-muted-foreground">
-            Meta Page ID: {competitor.meta_page_id}
+            {competitor.meta_page_id
+              ? `Meta Page ID: ${competitor.meta_page_id}`
+              : (competitor.website_url ?? "No identifier on file")}
           </p>
         </div>
         <RefreshAdsButton competitorId={competitor.id} />
@@ -48,8 +50,10 @@ export default async function CompetitorDetailPage({
 
       {ads.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No ads found for this Page. They may not currently be running ads in
-          the Meta Ad Library.
+          No ads recorded for this competitor yet. The Meta Ad Library API only
+          covers ads that reached the EU or are about social issues, elections
+          or politics, so most ordinary advertisers return nothing there — ads
+          found by research are submitted separately.
         </p>
       ) : (
         <div className="flex flex-col gap-4">

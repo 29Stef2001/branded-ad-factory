@@ -25,11 +25,9 @@ export async function addCompetitorAction(
     return { status: "error", message: "You must be signed in." };
   }
 
-  const competitor = await createCompetitor(
-    user.id,
-    parsed.data.name,
-    parsed.data.metaPageId,
-  );
+  const competitor = await createCompetitor(user.id, parsed.data.name, {
+    metaPageId: parsed.data.metaPageId,
+  });
 
   // Tracking the competitor never depends on a provider actually finding
   // ads: most ordinary commercial competitors are outside Meta Ad Library's

@@ -21,8 +21,13 @@ export function CompetitorList({ competitors }: { competitors: Competitor[] }) {
           <Card>
             <CardContent className="flex items-center justify-between">
               <span className="font-medium">{competitor.name}</span>
+              {/* Whichever identifier this competitor actually has. A
+                  discovered competitor has a website and no Page ID; one
+                  added by hand is usually the reverse. */}
               <span className="text-sm text-muted-foreground">
-                Page ID: {competitor.meta_page_id}
+                {competitor.meta_page_id
+                  ? `Page ID: ${competitor.meta_page_id}`
+                  : (competitor.website_url ?? "No identifier")}
               </span>
             </CardContent>
           </Card>
