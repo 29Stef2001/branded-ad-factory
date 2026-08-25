@@ -136,6 +136,36 @@ function errorResult(message: string) {
   };
 }
 
+/**
+ * What actually went wrong, in words, whatever was thrown.
+ *
+ * Every tool used to report `error instanceof Error ? error.message :
+ * "Unknown error."`, and Supabase does not throw Errors — a PostgrestError is
+ * a plain object carrying `message`, `code`, `details` and `hint`. So a real
+ * database failure reached the agent as the string "Unknown error." and
+ * nothing else. That happened: every competitor_ads_submit call failed with
+ * 42P10 (an unusable ON CONFLICT target), the agent retried six times with
+ * different payloads, concluded the endpoint was broken server-side, and had
+ * no way to learn otherwise. The database had been saying exactly what was
+ * wrong the whole time.
+ *
+ * The code is included because it is the part worth searching for, and the
+ * caller is a tenant-scoped agent reading its own workspace's errors — not a
+ * public surface where a Postgres error code would leak anything.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const e = error as { message?: string; code?: string; details?: string };
+    if (e.message) {
+      return [e.message, e.code && `(${e.code})`, e.details]
+        .filter(Boolean)
+        .join(" ");
+    }
+  }
+  return `Unrecognised failure: ${String(error)}`;
+}
+
 const options: McpHandlerOptions = {
   serverInfo: { name: "creative-factory-mcp", version: "0.1.0" },
 };
@@ -155,9 +185,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await metaGetWinners(input, userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -176,9 +204,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await metaGetCreativeDna(input, userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -196,9 +222,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorList(userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -217,9 +241,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorResearch(input, userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -238,9 +260,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorAdsSubmit(input, userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -259,9 +279,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorGetCreativeDna(userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -280,9 +298,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorGetWhitespace(userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -301,9 +317,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await factoryGetStatus(userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -322,9 +336,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await approvalGetStatus(input, userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
@@ -343,9 +355,7 @@ const handler = createMcpHandler((server) => {
       try {
         return textResult(await competitorDiscover(input, userId, db));
       } catch (error) {
-        return errorResult(
-          error instanceof Error ? error.message : "Unknown error.",
-        );
+        return errorResult(describeError(error));
       }
     },
   );
