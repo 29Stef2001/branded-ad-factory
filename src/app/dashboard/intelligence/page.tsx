@@ -15,10 +15,17 @@ import {
 } from "@/features/creative-intelligence/ui/evidence-badge";
 import { SyncButton } from "@/features/creative-intelligence/ui/sync-button";
 import {
+  countScoredCreativesByAccount,
+  listAdAccounts,
   listCreativeLinks,
   listRecentJobRuns,
   listScoredCreatives,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
+import { AccountPicker } from "@/features/creative-intelligence/ui/account-picker";
+import {
+  ACCOUNT_STATUS_LABELS,
+  canRunAds,
+} from "@/features/creative-intelligence/domain/account-status";
 import type {
   EvidenceTier,
   PrimaryMetric,
@@ -41,12 +48,30 @@ function pct(value: number | null): string {
   return value === null ? "—" : `${(value * 100).toFixed(2)}%`;
 }
 
-export default async function CreativePerformancePage() {
-  const [creatives, links, jobs] = await Promise.all([
-    listScoredCreatives(30),
-    listCreativeLinks(),
-    listRecentJobRuns(1),
-  ]);
+export default async function CreativePerformancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ accounts?: string }>;
+}) {
+  const { accounts: accountsParam } = await searchParams;
+  // No selection means every account. A ranking that hid itself until asked
+  // would be worse than the one this replaced — but pooling thirty accounts
+  // lets the busiest one fill the whole table, which is why narrowing it has
+  // to be one click away rather than a different page.
+  const selected = (accountsParam ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const [creatives, links, jobs, accounts, countsByAccount] = await Promise.all(
+    [
+      listScoredCreatives(30, undefined, undefined, selected),
+      listCreativeLinks(),
+      listRecentJobRuns(1),
+      listAdAccounts(),
+      countScoredCreativesByAccount(30),
+    ],
+  );
 
   const pendingReview = links.filter((link) => !link.confirmed).length;
   const lastRun = jobs[0];
@@ -62,10 +87,37 @@ export default async function CreativePerformancePage() {
         eyebrow={sectionFor("intelligence")}
         title="Creative Performance"
         subtitle={
-          creatives.length > 0 ? `${creatives.length} creatives` : undefined
+          creatives.length > 0
+            ? `${creatives.length} creative${creatives.length === 1 ? "" : "s"}` +
+              (selected.length > 0
+                ? ` · ${selected.length} account${selected.length === 1 ? "" : "s"}`
+                : " · all accounts")
+            : undefined
         }
         description="What every ad actually did, over the last 30 days. Scores are ranked on a lower confidence bound rather than the raw rate, so a creative with a handful of impressions cannot top the list on luck."
-        actions={<SyncButton />}
+        actions={
+          <div className="flex flex-wrap items-end gap-3">
+            <AccountPicker
+              accounts={accounts.map((row) => ({
+                id: row.ad_account_id,
+                label: row.name ?? row.ad_account_id,
+                count: countsByAccount.get(row.ad_account_id) ?? 0,
+                // Named rather than hidden: an account that can no longer run
+                // ads still has history worth ranking.
+                status: canRunAds(row.account_status)
+                  ? null
+                  : (ACCOUNT_STATUS_LABELS[row.account_status ?? -1] ??
+                    "Unavailable"),
+              }))}
+              selected={selected}
+              labels={{
+                unit: "scored creatives",
+                empty: "No account has a scored creative yet.",
+              }}
+            />
+            <SyncButton />
+          </div>
+        }
       />
 
       {lastRun && (
@@ -95,9 +147,17 @@ export default async function CreativePerformancePage() {
       {creatives.length === 0 ? (
         <EmptyState
           icon={BarChart3}
-          title="No performance data yet"
-          description="Run a sync to pull the last 28 days from your connected Meta account. Ads named with a concept code link to their concept automatically."
-          action={<SyncButton />}
+          title={
+            selected.length > 0
+              ? "Nothing scored on the selected accounts"
+              : "No performance data yet"
+          }
+          description={
+            selected.length > 0
+              ? "These accounts have no scored creative in the last 30 days. The count beside each account in the picker says which ones do."
+              : "Run a sync to pull the last 28 days from your connected Meta account. Ads named with a concept code link to their concept automatically."
+          }
+          action={selected.length > 0 ? undefined : <SyncButton />}
         />
       ) : (
         <>

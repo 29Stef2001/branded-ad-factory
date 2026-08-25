@@ -669,6 +669,39 @@ export async function upsertCreativeMetrics(
  * rollup, never the daily facts, which is what keeps a page render cheap at a
  * million creatives.
  */
+/**
+ * How many scored creatives each account holds, for the account picker.
+ *
+ * Counted here rather than derived from the ranking the page already fetches,
+ * because that one is filtered by the current selection: deriving the counts
+ * from it would make every unticked account read zero, which is exactly the
+ * dead end this picker exists to prevent.
+ */
+export async function countScoredCreativesByAccount(
+  windowDays = 30,
+  userId?: string,
+  db?: Db,
+): Promise<Map<string, number>> {
+  const supabase = await resolve(db);
+
+  const rows = await fetchAllRows<{ ad_account_id: string | null }>(
+    scopedToUser(
+      supabase
+        .from("creative_metrics")
+        .select("ad_account_id")
+        .eq("window_days", windowDays),
+      userId,
+    ).order("id", { ascending: true }),
+  );
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.ad_account_id) continue;
+    counts.set(row.ad_account_id, (counts.get(row.ad_account_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function listScoredCreatives(
   windowDays = 30,
   /**
@@ -680,6 +713,14 @@ export async function listScoredCreatives(
    */
   userId?: string,
   db?: Db,
+  /**
+   * Narrows the ranking to these accounts. Empty or omitted means every
+   * account, because a ranking that showed nothing until a choice was made
+   * would be a worse page than the one this replaced — unlike DNA, where
+   * pooling accounts corrupts the tally, pooling here only makes the busiest
+   * account dominate, which is a thing worth being able to see.
+   */
+  adAccountIds?: string[],
 ): Promise<
   (CreativeMetricRow & {
     concept_headline: string | null;
@@ -691,16 +732,22 @@ export async function listScoredCreatives(
   // on score alone is not a stable sequence — paging it would repeat some rows
   // and skip others. There are already 1,054 scored creatives, so the
   // unbounded version was dropping the tail of the ranking outright.
+  const base = scopedToUser(
+    supabase
+      .from("creative_metrics")
+      .select(
+        "id, concept_id, meta_entity_id, ad_account_id, window_days, impressions, clicks, link_clicks, spend, purchases, revenue, ctr, ctr_lower_bound, cpc, cpm, cpa, roas, roas_shrunk, composite_score, primary_metric, evidence_tier, percentile_rank, computed_at, ad_concepts(headline), meta_ad_entities(name)",
+      )
+      .eq("window_days", windowDays),
+    userId,
+  );
+  const scoped =
+    adAccountIds && adAccountIds.length > 0
+      ? base.in("ad_account_id", adAccountIds)
+      : base;
+
   const data = await fetchAllRows(
-    scopedToUser(
-      supabase
-        .from("creative_metrics")
-        .select(
-          "id, concept_id, meta_entity_id, window_days, impressions, clicks, link_clicks, spend, purchases, revenue, ctr, ctr_lower_bound, cpc, cpm, cpa, roas, roas_shrunk, composite_score, primary_metric, evidence_tier, percentile_rank, computed_at, ad_concepts(headline), meta_ad_entities(name)",
-        )
-        .eq("window_days", windowDays),
-      userId,
-    )
+    scoped
       .order("composite_score", { ascending: false, nullsFirst: false })
       .order("id", { ascending: true }),
   );

@@ -11,7 +11,7 @@ import {
   listCreativesForDna,
 } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import { dnaLabel } from "@/features/creative-intelligence/domain/creative-dna";
-import { DnaAccountPicker } from "@/features/creative-intelligence/ui/dna-account-picker";
+import { AccountPicker } from "@/features/creative-intelligence/ui/account-picker";
 import { listAdAccounts } from "@/features/creative-intelligence/infrastructure/creative-intelligence-repository";
 import {
   ACCOUNT_STATUS_LABELS,
@@ -95,11 +95,11 @@ export default async function CreativeDnaPage({
         description="What your best creatives are actually doing — hook, angle, awareness level, composition — recorded in one vocabulary so patterns can be compared across hundreds of ads rather than admired one at a time."
         actions={
           <div className="flex flex-wrap items-end gap-3">
-            <DnaAccountPicker
+            <AccountPicker
               accounts={accounts.map((row) => ({
                 id: row.ad_account_id,
                 label: row.name ?? row.ad_account_id,
-                eligible: allEligible.filter(
+                count: allEligible.filter(
                   (creative) => creative.adAccountId === row.ad_account_id,
                 ).length,
                 // Named rather than hidden: an account that cannot run ads
@@ -110,6 +110,10 @@ export default async function CreativeDnaPage({
                     "Unavailable"),
               }))}
               selected={selected}
+              labels={{
+                unit: "creatives worth reading",
+                empty: "No account has a creative with enough delivery yet.",
+              }}
             />
             <AnalyseDnaButton eligible={remaining} adAccountIds={selected} />
           </div>

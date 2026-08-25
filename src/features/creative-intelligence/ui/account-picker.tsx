@@ -7,31 +7,50 @@ import { ChevronDown } from "lucide-react";
 export type PickerAccount = {
   id: string;
   label: string;
-  eligible: number;
+  /** How much this account has to offer for the page doing the asking. */
+  count: number;
   status: string | null;
 };
 
+export type PickerLabels = {
+  /**
+   * Plural noun for what `count` measures, e.g. "creatives worth reading".
+   * Read into sentences, so it has to survive "3 <unit>" and "2 accounts have
+   * <unit>".
+   */
+  unit: string;
+  /** Shown above the list when no account has anything at all. */
+  empty: string;
+};
+
 /**
- * Which accounts' patterns are being read, as a dropdown of checkboxes.
+ * Which ad accounts a page is scoped to, as a dropdown of checkboxes.
+ *
+ * Shared rather than copied. Creative DNA asked the question first and
+ * Creative Performance asks the same one; two pickers would drift on the
+ * ordering rule below, which is the part that took a bug report to get right.
+ * Only the wording differs, and that arrives as `labels`.
  *
  * A dropdown rather than a row of buttons because there are 44 of them: laid
  * out flat they push the analyse button off the screen, and the thing you came
  * to press should not be below the thing you came to choose.
  *
  * Every account is listed, including ones with nothing to read yet. An account
- * with no eligible creatives today has some tomorrow, and a picker that quietly
+ * with nothing to offer today has something tomorrow, and a picker that quietly
  * omits half the list leaves someone hunting for one that is simply not drawn.
  * The count says what each holds; the choice stays with the user.
  *
  * The selection lives in the URL so it survives a reload, can be linked to, and
  * is readable by the server component that fetches on it.
  */
-export function DnaAccountPicker({
+export function AccountPicker({
   accounts,
   selected,
+  labels,
 }: {
   accounts: PickerAccount[];
   selected: string[];
+  labels: PickerLabels;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -73,12 +92,12 @@ export function DnaAccountPicker({
         : [...selected, id],
     );
 
-  const withWork = accounts.filter((account) => account.eligible > 0);
+  const withWork = accounts.filter((account) => account.count > 0);
   // Accounts with something to read come first. Alphabetical order buried the
   // five that matter among forty-four that do not, which is how someone ticks
   // three empty ones and concludes the feature is broken.
   const ordered = [...accounts].sort(
-    (a, b) => b.eligible - a.eligible || a.label.localeCompare(b.label),
+    (a, b) => b.count - a.count || a.label.localeCompare(b.label),
   );
   const visible = query.trim()
     ? ordered.filter((account) =>
@@ -121,8 +140,8 @@ export function DnaAccountPicker({
 
           <p className="px-1 text-xs text-muted-foreground">
             {withWork.length === 0
-              ? "No account has a creative with enough delivery yet."
-              : `${withWork.length} account${withWork.length === 1 ? "" : "s"} ${withWork.length === 1 ? "has" : "have"} creatives worth reading — those are listed first.`}
+              ? labels.empty
+              : `${withWork.length} account${withWork.length === 1 ? "" : "s"} ${withWork.length === 1 ? "has" : "have"} ${labels.unit} — those are listed first.`}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 px-1">
@@ -173,17 +192,17 @@ export function DnaAccountPicker({
                   )}
                   <span
                     className={
-                      account.eligible > 0
+                      account.count > 0
                         ? "shrink-0 rounded-full bg-success/15 px-1.5 text-xs text-success tabular-nums"
                         : "shrink-0 text-xs text-muted-foreground/40 tabular-nums"
                     }
                     title={
-                      account.eligible > 0
-                        ? `${account.eligible} creatives worth reading`
-                        : "No creative with enough delivery yet"
+                      account.count > 0
+                        ? `${account.count} ${labels.unit}`
+                        : `No ${labels.unit} yet`
                     }
                   >
-                    {account.eligible > 0 ? account.eligible : "—"}
+                    {account.count > 0 ? account.count : "—"}
                   </span>
                 </label>
               ))
