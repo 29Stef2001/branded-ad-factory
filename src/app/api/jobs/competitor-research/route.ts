@@ -42,6 +42,8 @@ type UserResult = {
   analysed: number;
   failed: number;
   skipped: number;
+  /** Ads still waiting for a DNA read after this pass. */
+  stillToAnalyse: number;
   /** One line per competitor per provider — what each source found or why not. */
   providerNotes: string[];
   error?: string;
@@ -103,6 +105,7 @@ export async function GET(request: NextRequest) {
         analysed: 0,
         failed: 0,
         skipped: userCompetitors.length,
+        stillToAnalyse: 0,
         providerNotes: [],
         error: "A research run is already in progress.",
       });
@@ -113,6 +116,8 @@ export async function GET(request: NextRequest) {
     let analysed = 0;
     let failed = 0;
     let skipped = 0;
+    // Ads left unanalysed this pass — non-zero means run again.
+    let stillToAnalyse = 0;
     const providerNotes: string[] = [];
 
     try {
@@ -145,14 +150,20 @@ export async function GET(request: NextRequest) {
             );
           }
 
+          // The deadline goes in because this is the expensive half: without
+          // it a single competitor's analyses could run past the platform's
+          // ceiling, killing the invocation before finishCompetitorResearchJob
+          // could release the claim.
           const dna = await analyseCompetitorDnaForCompetitor(
             userId,
             competitor.id,
             DNA_LIMIT_PER_COMPETITOR,
             admin,
+            deadline,
           );
           analysed += dna.analysed;
           failed += dna.failed;
+          stillToAnalyse += dna.remaining;
 
           await markCompetitorSynced(competitor.id, admin);
         } catch (error) {
@@ -185,6 +196,7 @@ export async function GET(request: NextRequest) {
         analysed,
         failed,
         skipped,
+        stillToAnalyse,
         providerNotes,
         error: message,
       });
@@ -198,6 +210,7 @@ export async function GET(request: NextRequest) {
       analysed,
       failed,
       skipped,
+      stillToAnalyse,
       providerNotes,
     });
   }

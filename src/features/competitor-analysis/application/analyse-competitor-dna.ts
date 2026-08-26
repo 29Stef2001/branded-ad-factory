@@ -121,19 +121,44 @@ async function analyseOneAd(
 export type CompetitorDnaRunResult = {
   analysed: number;
   failed: number;
+  /** Ads this call left untouched — either over `limit` or out of time. */
+  remaining: number;
 };
+
+/**
+ * What one analysis is assumed to cost, when a deadline is in play.
+ *
+ * Measured against real runs rather than guessed: a text-only DNA call takes
+ * a few seconds, and the loop must not start one it cannot finish. The
+ * reserve is deliberately generous because the two failures are not
+ * symmetric — overshooting kills the whole invocation before its caller can
+ * record what it did, while stopping early only leaves ads for the next
+ * pass, which is what `remaining` exists to report.
+ */
+const ESTIMATED_ANALYSIS_MS = 12_000;
 
 /**
  * Runs DNA analysis for one competitor's not-yet-analysed ads, up to `limit`.
  *
- * Used both by the manual "Refresh ads" flow (interactive client, no `db`) and
- * the competitor-research cron job (service-role client passed as `db`).
+ * Used by the manual "Refresh ads" flow (interactive client, no `db`), the
+ * `competitor_ads_submit` MCP tool, and the competitor-research cron job
+ * (service-role client passed as `db`).
+ *
+ * `deadline` exists because this is the expensive half of that cron job and
+ * it used to be invisible to the budget. The route checked the clock before
+ * each competitor but never inside this loop, so a single competitor with
+ * ten unanalysed ads could spend a minute here — past the platform's 60s
+ * ceiling, killed before `finishCompetitorResearchJob` ran, leaving a
+ * `running` claim that blocked every later run until it went stale. Callers
+ * with a wall-clock limit pass it; callers without one (a user clicking a
+ * button) omit it and get the old behaviour.
  */
 export async function analyseCompetitorDnaForCompetitor(
   userId: string,
   competitorId: string,
   limit = DEFAULT_LIMIT,
   db?: Db,
+  deadline?: number,
 ): Promise<CompetitorDnaRunResult> {
   const [candidates, alreadyDone] = await Promise.all([
     listCompetitorAdsForDna(competitorId, limit * 3, db),
@@ -147,12 +172,18 @@ export async function analyseCompetitorDnaForCompetitor(
 
   let analysed = 0;
   let failed = 0;
-  for (const ad of todo) {
+  let stoppedAt = todo.length;
+
+  for (const [index, ad] of todo.entries()) {
+    if (deadline !== undefined && Date.now() + ESTIMATED_ANALYSIS_MS > deadline) {
+      stoppedAt = index;
+      break;
+    }
     if (await analyseOneAd(userId, ad, db)) analysed += 1;
     else failed += 1;
   }
 
-  return { analysed, failed };
+  return { analysed, failed, remaining: todo.length - stoppedAt };
 }
 
 export async function analyseCompetitorDnaAction(
