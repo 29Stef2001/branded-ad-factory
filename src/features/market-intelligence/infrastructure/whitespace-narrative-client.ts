@@ -45,7 +45,7 @@ function describe(patterns: WhitespaceResult["sharedPatterns"]): string {
     .map((pattern) => {
       const evidence = pattern.theirsByAdvertiser;
       const breadth = evidence
-        ? ` — used by ${evidence.usedBy} of ${evidence.outOf} distinct advertisers` +
+        ? ` — a habit for ${evidence.usedBy} of ${evidence.outOf} distinct advertisers` +
           (evidence.usedBy <= 1
             ? " (ONE advertiser only: this is that advertiser's habit, not a market pattern)"
             : "")

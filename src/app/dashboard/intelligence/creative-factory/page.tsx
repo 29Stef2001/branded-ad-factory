@@ -245,7 +245,10 @@ function PatternGroup({
                 — us {pattern.oursPct.toFixed(0)}%, them{" "}
                 {pattern.theirsPct.toFixed(0)}%
                 {evidence
-                  ? ` · ${evidence.usedBy}/${evidence.outOf} advertisers`
+                  ? ` · ${evidence.usedBy}/${evidence.outOf} advertisers` +
+                    (evidence.presentIn > evidence.usedBy
+                      ? ` (${evidence.presentIn} touched it marginally)`
+                      : "")
                   : ""}
               </span>
               {oneAdvertiserOnly && (

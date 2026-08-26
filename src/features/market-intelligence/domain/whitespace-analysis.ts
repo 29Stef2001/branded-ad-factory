@@ -39,9 +39,24 @@ export type FeatureCategory = "hookType" | "angle" | "offerType" | "emotionalDri
  */
 export type AdvertiserEvidence = {
   meanPct: number;
+  /** Advertisers for whom this is a habit, not an outlier — see MIN_ADVERTISER_SHARE_PCT. */
   usedBy: number;
+  /** Advertisers who used it even once, however marginally. */
+  presentIn: number;
   outOf: number;
 };
+
+/**
+ * How much of an advertiser's output a value needs before that advertiser
+ * counts as using it.
+ *
+ * A bare "appears at least once" is useless at this scale: with three
+ * advertisers running dozens of ads each, nearly every value appears
+ * somewhere in all three, and every pattern scores 3/3 — a discriminator
+ * that never discriminates. Ten percent separates a habit from a one-off
+ * without demanding a value dominate.
+ */
+const MIN_ADVERTISER_SHARE_PCT = 10;
 
 export type WhitespacePattern = {
   category: FeatureCategory;
@@ -135,7 +150,8 @@ function evidenceByAdvertiser(
 
   return {
     meanPct: shares.reduce((sum, share) => sum + share, 0) / shares.length,
-    usedBy: shares.filter((share) => share > 0).length,
+    usedBy: shares.filter((share) => share >= MIN_ADVERTISER_SHARE_PCT).length,
+    presentIn: shares.filter((share) => share > 0).length,
     outOf: shares.length,
   };
 }

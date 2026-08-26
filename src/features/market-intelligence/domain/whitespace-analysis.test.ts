@@ -171,7 +171,7 @@ describe("isMarketWide", () => {
     expect(
       isMarketWide({
         ...base,
-        theirsByAdvertiser: { meanPct: 40, usedBy: 1, outOf: 3 },
+        theirsByAdvertiser: { meanPct: 40, usedBy: 1, presentIn: 1, outOf: 3 },
       }),
     ).toBe(false);
   });
@@ -180,7 +180,7 @@ describe("isMarketWide", () => {
     expect(
       isMarketWide({
         ...base,
-        theirsByAdvertiser: { meanPct: 30, usedBy: 2, outOf: 3 },
+        theirsByAdvertiser: { meanPct: 30, usedBy: 2, presentIn: 2, outOf: 3 },
       }),
     ).toBe(true);
   });
@@ -193,11 +193,11 @@ describe("isMarketWide", () => {
     const marketPattern = {
       ...base,
       value: "pain",
-      theirsByAdvertiser: { meanPct: 30, usedBy: 3, outOf: 3 },
+      theirsByAdvertiser: { meanPct: 30, usedBy: 3, presentIn: 3, outOf: 3 },
     };
     const houseStyle = {
       ...base,
-      theirsByAdvertiser: { meanPct: 40, usedBy: 1, outOf: 3 },
+      theirsByAdvertiser: { meanPct: 40, usedBy: 1, presentIn: 1, outOf: 3 },
     };
 
     const { marketWide, singleAdvertiser } = partitionByAdvertiserBreadth([
@@ -206,5 +206,37 @@ describe("isMarketWide", () => {
     ]);
     expect(marketWide).toEqual([marketPattern]);
     expect(singleAdvertiser).toEqual([houseStyle]);
+  });
+});
+
+describe("the advertiser-share threshold", () => {
+  it("does not credit an advertiser for a value that is a rounding error in its output", () => {
+    // The failure this replaced: counting "appeared at least once" made every
+    // pattern 3/3 on real data, because three advertisers running dozens of
+    // ads each touch nearly every value somewhere. One ad in fifty is not a
+    // habit.
+    const ours = repeat({ hook_type: "outcome" }, 10);
+    const theirs = [
+      ...Array.from({ length: 49 }, () =>
+        row({ hook_type: "pain", advertiser: "a.example" }),
+      ),
+      row({ hook_type: "scarcity", advertiser: "a.example" }),
+      ...Array.from({ length: 25 }, () =>
+        row({ hook_type: "scarcity", advertiser: "b.example" }),
+      ),
+    ];
+
+    const result = computeWhitespace(ours, theirs);
+    const all = [
+      ...result.sharedPatterns,
+      ...result.competitorLeaning,
+      ...result.whitespace,
+    ];
+    const scarcity = all.find((p) => p.value === "scarcity");
+
+    // Advertiser A ran one scarcity ad out of fifty — present, but not a habit.
+    expect(scarcity?.theirsByAdvertiser?.presentIn).toBe(2);
+    expect(scarcity?.theirsByAdvertiser?.usedBy).toBe(1);
+    expect(isMarketWide(scarcity!)).toBe(false);
   });
 });
