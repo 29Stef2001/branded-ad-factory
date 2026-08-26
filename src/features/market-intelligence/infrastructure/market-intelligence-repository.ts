@@ -59,18 +59,103 @@ export async function listOwnFeatures(
   );
 }
 
+/**
+ * The advertiser behind each tracked competitor page, keyed by the landing
+ * page its ads actually point at.
+ *
+ * The page name cannot do this job. Three advertisers ran all 141 competitor
+ * ads here through persona pages — "Dr. Cindy Stafford", "The Wellness
+ * Digest", "Sarah Walker" — and only the destination reveals that they are
+ * one advertiser. The name is what someone typed when adding the competitor;
+ * the domain is a fact about the ad.
+ *
+ * A page whose ads carry no landing page falls back to its own id, so it
+ * counts as its own advertiser. That is the conservative direction: it can
+ * split one advertiser into several, which understates how concentrated the
+ * market is, where the opposite would invent breadth that isn't there.
+ */
+async function advertiserByCompetitor(
+  userId: string,
+  db: Db,
+): Promise<Map<string, string>> {
+  const ads = await fetchAllRows<{
+    id: string;
+    competitor_id: string;
+    landing_page_url: string | null;
+  }>(
+    db
+      .from("competitor_ads")
+      .select("id, competitor_id, landing_page_url, competitors!inner(user_id)")
+      .eq("competitors.user_id", userId)
+      .order("id", { ascending: true }),
+  );
+
+  const domainsPerCompetitor = new Map<string, Map<string, number>>();
+  for (const ad of ads) {
+    if (!ad.landing_page_url) continue;
+    let host: string;
+    try {
+      host = new URL(ad.landing_page_url).hostname.toLowerCase();
+    } catch {
+      continue;
+    }
+    host = host.replace(/^www\./, "");
+    const counts = domainsPerCompetitor.get(ad.competitor_id) ?? new Map();
+    counts.set(host, (counts.get(host) ?? 0) + 1);
+    domainsPerCompetitor.set(ad.competitor_id, counts);
+  }
+
+  const result = new Map<string, string>();
+  for (const ad of ads) {
+    if (result.has(ad.competitor_id)) continue;
+    const counts = domainsPerCompetitor.get(ad.competitor_id);
+    // The competitor's most common destination — a persona page occasionally
+    // links elsewhere, and one stray link should not rename the advertiser.
+    const dominant = counts
+      ? [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+      : `competitor:${ad.competitor_id}`;
+    result.set(ad.competitor_id, dominant);
+  }
+  return result;
+}
+
 export async function listCompetitorFeaturesForWhitespace(
   userId: string,
   db?: Db,
 ): Promise<FeatureRow[]> {
   const supabase = await resolve(db);
-  return fetchAllRows(
-    supabase
-      .from("competitor_creative_features")
-      .select("id, hook_type, angle, offer_type, emotional_driver")
-      .eq("user_id", userId)
-      .order("id", { ascending: true }),
-  );
+  const [rows, advertisers] = await Promise.all([
+    fetchAllRows<{
+      id: string;
+      hook_type: string | null;
+      angle: string | null;
+      offer_type: string | null;
+      emotional_driver: string | null;
+      competitor_ads: { competitor_id: string } | null;
+    }>(
+      supabase
+        .from("competitor_creative_features")
+        .select(
+          "id, hook_type, angle, offer_type, emotional_driver, competitor_ads(competitor_id)",
+        )
+        .eq("user_id", userId)
+        .order("id", { ascending: true }),
+    ),
+    advertiserByCompetitor(userId, supabase),
+  ]);
+
+  return rows.map((row) => {
+    const competitorId = row.competitor_ads?.competitor_id;
+    return {
+      hook_type: row.hook_type,
+      angle: row.angle,
+      offer_type: row.offer_type,
+      emotional_driver: row.emotional_driver,
+      advertiser: competitorId
+        ? (advertisers.get(competitorId) ?? `competitor:${competitorId}`)
+        : null,
+    };
+  });
 }
 
 /** The last cached run for this exact input, if the aggregation hasn't changed since. */

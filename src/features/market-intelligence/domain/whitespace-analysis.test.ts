@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   computeWhitespace,
+  isMarketWide,
+  partitionByAdvertiserBreadth,
   type FeatureRow,
 } from "@/features/market-intelligence/domain/whitespace-analysis";
 
@@ -88,5 +90,121 @@ describe("computeWhitespace", () => {
     expect(result.sharedPatterns).toContainEqual(
       expect.objectContaining({ value: "pain", oursPct: 100, theirsPct: 100 }),
     );
+  });
+});
+
+describe("advertiser-weighted evidence", () => {
+  /**
+   * The case this exists for. One advertiser running many persona pages
+   * produced most of the competitor ads on this account, so counting ads
+   * alone reported its house style as a market pattern.
+   */
+  function ad(value: string, advertiser: string): FeatureRow {
+    return row({ hook_type: value, advertiser });
+  }
+
+  it("reports how many distinct advertisers use a value, not how many ads", () => {
+    const ours = repeat({ hook_type: "outcome" }, 10);
+    const theirs = [
+      // Twelve ads, but one advertiser behind all of them.
+      ...Array.from({ length: 12 }, () => ad("scarcity", "big.example")),
+      ...Array.from({ length: 3 }, () => ad("pain", "small-a.example")),
+      ...Array.from({ length: 3 }, () => ad("pain", "small-b.example")),
+    ];
+
+    const result = computeWhitespace(ours, theirs);
+    const all = [
+      ...result.sharedPatterns,
+      ...result.competitorLeaning,
+      ...result.whitespace,
+    ];
+
+    const scarcity = all.find((p) => p.value === "scarcity");
+    expect(scarcity?.theirsByAdvertiser).toMatchObject({ usedBy: 1, outOf: 3 });
+
+    const pain = all.find((p) => p.value === "pain");
+    expect(pain?.theirsByAdvertiser).toMatchObject({ usedBy: 2, outOf: 3 });
+  });
+
+  it("gives every advertiser one vote, so a crowded one cannot dominate the mean", () => {
+    const ours = repeat({ hook_type: "outcome" }, 10);
+    const theirs = [
+      ...Array.from({ length: 18 }, () => ad("scarcity", "big.example")),
+      ...Array.from({ length: 2 }, () => ad("pain", "small.example")),
+    ];
+
+    const result = computeWhitespace(ours, theirs);
+    const all = [
+      ...result.sharedPatterns,
+      ...result.competitorLeaning,
+      ...result.whitespace,
+    ];
+    const scarcity = all.find((p) => p.value === "scarcity");
+
+    // 18 of 20 ads is 90% by ad count, but one of two advertisers is 50%.
+    expect(scarcity?.theirsPct).toBeCloseTo(90, 0);
+    expect(scarcity?.theirsByAdvertiser?.meanPct).toBeCloseTo(50, 0);
+  });
+
+  it("reports nothing rather than guessing when no row names an advertiser", () => {
+    const ours = repeat({ hook_type: "outcome" }, 10);
+    const theirs = repeat({ hook_type: "scarcity" }, 10);
+    const result = computeWhitespace(ours, theirs);
+    const all = [
+      ...result.sharedPatterns,
+      ...result.competitorLeaning,
+      ...result.whitespace,
+    ];
+    expect(all.every((p) => p.theirsByAdvertiser === null)).toBe(true);
+  });
+});
+
+describe("isMarketWide", () => {
+  const base = {
+    category: "hookType" as const,
+    value: "scarcity",
+    oursPct: 0,
+    theirsPct: 40,
+  };
+
+  it("rejects a pattern only one advertiser uses, however many ads it ran", () => {
+    expect(
+      isMarketWide({
+        ...base,
+        theirsByAdvertiser: { meanPct: 40, usedBy: 1, outOf: 3 },
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts a pattern two or more advertisers use", () => {
+    expect(
+      isMarketWide({
+        ...base,
+        theirsByAdvertiser: { meanPct: 30, usedBy: 2, outOf: 3 },
+      }),
+    ).toBe(true);
+  });
+
+  it("treats unmeasured breadth as not proven, rather than assuming the best", () => {
+    expect(isMarketWide({ ...base, theirsByAdvertiser: null })).toBe(false);
+  });
+
+  it("splits a mixed list into what the market does and what one advertiser does", () => {
+    const marketPattern = {
+      ...base,
+      value: "pain",
+      theirsByAdvertiser: { meanPct: 30, usedBy: 3, outOf: 3 },
+    };
+    const houseStyle = {
+      ...base,
+      theirsByAdvertiser: { meanPct: 40, usedBy: 1, outOf: 3 },
+    };
+
+    const { marketWide, singleAdvertiser } = partitionByAdvertiserBreadth([
+      marketPattern,
+      houseStyle,
+    ]);
+    expect(marketWide).toEqual([marketPattern]);
+    expect(singleAdvertiser).toEqual([houseStyle]);
   });
 });

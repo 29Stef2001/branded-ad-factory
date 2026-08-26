@@ -30,13 +30,28 @@ export type WhitespaceNarrativeResult = {
 
 const MODEL = "claude-opus-5";
 
+/**
+ * One line per pattern, carrying how many advertisers back it.
+ *
+ * The advertiser count is here because the per-ad percentage alone misleads
+ * on this data: three advertisers running persona pages produced every
+ * competitor ad, so a value at 18% of ads can be one advertiser's template.
+ * Handing the model the share without the breadth invites it to write "the
+ * market does X" about a single company.
+ */
 function describe(patterns: WhitespaceResult["sharedPatterns"]): string {
   if (patterns.length === 0) return "(none)";
   return patterns
-    .map(
-      (pattern) =>
-        `${pattern.category} = ${dnaLabel(pattern.value)}: us ${pattern.oursPct.toFixed(0)}%, competitors ${pattern.theirsPct.toFixed(0)}%`,
-    )
+    .map((pattern) => {
+      const evidence = pattern.theirsByAdvertiser;
+      const breadth = evidence
+        ? ` — used by ${evidence.usedBy} of ${evidence.outOf} distinct advertisers` +
+          (evidence.usedBy <= 1
+            ? " (ONE advertiser only: this is that advertiser's habit, not a market pattern)"
+            : "")
+        : " — advertiser breadth unknown";
+      return `${pattern.category} = ${dnaLabel(pattern.value)}: us ${pattern.oursPct.toFixed(0)}%, competitors ${pattern.theirsPct.toFixed(0)}% of ads${breadth}`;
+    })
     .join("\n");
 }
 
@@ -66,7 +81,9 @@ ${describe(result.whitespace)}
 
 Based on ${result.oursSampleSize} of our own analysed creatives and ${result.theirsSampleSize} competitor ads.
 
-Write each observation as a plain statement of the pattern, e.g. "Competitors lean heavily on price-led offers; our strongest creatives are outcome-led — a testable whitespace." Do not invent numbers beyond the percentages given. Do not claim anything about how well competitor ads perform — there is no spend, CPA or ROAS data for them, only what patterns appear in their copy. Label these as observations, not recommendations: you are describing a pattern, not proposing a test.`,
+Write each observation as a plain statement of the pattern, e.g. "Competitors lean heavily on price-led offers; our strongest creatives are outcome-led — a testable whitespace." Do not invent numbers beyond the percentages given. Do not claim anything about how well competitor ads perform — there is no spend, CPA or ROAS data for them, only what patterns appear in their copy. Label these as observations, not recommendations: you are describing a pattern, not proposing a test.
+
+Weigh advertiser breadth above the raw percentage. These competitor ads come from a small number of advertisers, several of which run many near-identical persona pages, so a high share of ads can be one company repeating itself. Say "the market" only for patterns two or more distinct advertisers use; for a pattern marked ONE advertiser, name it as that single advertiser's approach instead. Prefer a pattern backed by more advertisers over one backed by a bigger percentage.`,
       },
     ],
   });

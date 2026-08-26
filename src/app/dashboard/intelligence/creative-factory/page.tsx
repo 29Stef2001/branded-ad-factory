@@ -12,6 +12,7 @@ import { listCompetitorFeaturesForWhitespace } from "@/features/market-intellige
 import { getWhitespaceView } from "@/features/market-intelligence/application/synthesize-whitespace";
 import { RefreshWhitespaceButton } from "@/features/market-intelligence/ui/refresh-whitespace-button";
 import type { EvidenceTier } from "@/features/creative-intelligence/domain/scoring";
+import type { WhitespacePattern } from "@/features/market-intelligence/domain/whitespace-analysis";
 import { EvidenceBadge } from "@/features/creative-intelligence/ui/evidence-badge";
 
 export const metadata: Metadata = {
@@ -219,7 +220,7 @@ function PatternGroup({
 }: {
   title: string;
   tone: "muted" | "warning" | "success";
-  patterns: { category: string; value: string; oursPct: number; theirsPct: number }[];
+  patterns: WhitespacePattern[];
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -227,19 +228,35 @@ function PatternGroup({
       {patterns.length === 0 ? (
         <span className="text-sm text-muted-foreground">None found</span>
       ) : (
-        patterns.slice(0, 5).map((pattern) => (
-          <div
-            key={`${pattern.category}-${pattern.value}`}
-            className="text-sm"
-          >
-            <span>{dnaLabel(pattern.value)}</span>
-            <span className="text-muted-foreground">
-              {" "}
-              — us {pattern.oursPct.toFixed(0)}%, them{" "}
-              {pattern.theirsPct.toFixed(0)}%
-            </span>
-          </div>
-        ))
+        patterns.slice(0, 5).map((pattern) => {
+          const evidence = pattern.theirsByAdvertiser;
+          // A share of ads says how loud a pattern is; the advertiser count
+          // says whether it is the market or one company repeating itself
+          // across persona pages. Both, or the first misleads.
+          const oneAdvertiserOnly = evidence !== null && evidence.usedBy <= 1;
+          return (
+            <div
+              key={`${pattern.category}-${pattern.value}`}
+              className="text-sm"
+            >
+              <span>{dnaLabel(pattern.value)}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                — us {pattern.oursPct.toFixed(0)}%, them{" "}
+                {pattern.theirsPct.toFixed(0)}%
+                {evidence
+                  ? ` · ${evidence.usedBy}/${evidence.outOf} advertisers`
+                  : ""}
+              </span>
+              {oneAdvertiserOnly && (
+                <span className="text-warning">
+                  {" "}
+                  — one advertiser, not the market
+                </span>
+              )}
+            </div>
+          );
+        })
       )}
     </div>
   );

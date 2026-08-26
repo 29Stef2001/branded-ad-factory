@@ -14,9 +14,34 @@ export type FeatureRow = {
   angle: string | null;
   offer_type: string | null;
   emotional_driver: string | null;
+  /**
+   * Who ran this ad, as a stable key — a landing-page domain, not a page name.
+   *
+   * Counting ads alone answers the wrong question. Of 141 competitor ads,
+   * every one belonged to three advertisers running persona pages: a single
+   * house style repeated across fourteen "authors" reads as a 46% market
+   * pattern when it is one advertiser with a template. Optional because a row
+   * whose advertiser cannot be established still counts toward the per-ad
+   * figures; it just cannot vote.
+   */
+  advertiser?: string | null;
 };
 
 export type FeatureCategory = "hookType" | "angle" | "offerType" | "emotionalDriver";
+
+/**
+ * The same pattern counted by advertiser rather than by ad.
+ *
+ * `meanPct` gives every advertiser one vote regardless of how many ads it
+ * ran. `usedBy`/`outOf` is the blunter and more useful number: a value at 18%
+ * of all ads that only one of three advertisers uses is that advertiser's
+ * habit, not the market's.
+ */
+export type AdvertiserEvidence = {
+  meanPct: number;
+  usedBy: number;
+  outOf: number;
+};
 
 export type WhitespacePattern = {
   category: FeatureCategory;
@@ -25,6 +50,8 @@ export type WhitespacePattern = {
   oursPct: number;
   /** Share of analysed competitor ads using this value, 0-100. */
   theirsPct: number;
+  /** Null when no competitor row carried an advertiser key. */
+  theirsByAdvertiser: AdvertiserEvidence | null;
 };
 
 export type WhitespaceResult = {
@@ -74,11 +101,56 @@ function distribution(
 }
 
 /**
+ * A value's share within each advertiser, averaged so every advertiser counts
+ * once — plus how many of them use it at all.
+ *
+ * Returns null when no row carries an advertiser key, so callers can tell
+ * "not measured" from "measured, and only one advertiser does this".
+ */
+function evidenceByAdvertiser(
+  rows: FeatureRow[],
+  column: keyof FeatureRow,
+  value: string,
+): AdvertiserEvidence | null {
+  const byAdvertiser = new Map<string, FeatureRow[]>();
+  for (const row of rows) {
+    if (!row.advertiser) continue;
+    const list = byAdvertiser.get(row.advertiser) ?? [];
+    list.push(row);
+    byAdvertiser.set(row.advertiser, list);
+  }
+  if (byAdvertiser.size === 0) return null;
+
+  const shares: number[] = [];
+  for (const advertiserRows of byAdvertiser.values()) {
+    const withValue = advertiserRows.filter((row) => row[column]);
+    // An advertiser with nothing in this category abstains rather than
+    // voting zero — otherwise a competitor we happen to hold two ads for
+    // drags every share toward nothing.
+    if (withValue.length === 0) continue;
+    const matching = withValue.filter((row) => row[column] === value).length;
+    shares.push((matching / withValue.length) * 100);
+  }
+  if (shares.length === 0) return null;
+
+  return {
+    meanPct: shares.reduce((sum, share) => sum + share, 0) / shares.length,
+    usedBy: shares.filter((share) => share > 0).length,
+    outOf: shares.length,
+  };
+}
+
+/**
  * Diffs two sides' distributions across the shared vocabulary.
  *
  * Both sides need a minimum sample per category before its distribution means
  * anything — three of our creatives happening to share a hook type is not a
  * pattern, it is three data points.
+ *
+ * Each pattern also carries `theirsByAdvertiser`, because the per-ad share on
+ * its own overstates a crowded advertiser. It was measured: three advertisers
+ * running persona pages produced all 141 competitor ads, and values at 17-19%
+ * of ads turned out to come from one of them.
  */
 export function computeWhitespace(
   ours: FeatureRow[],
@@ -97,7 +169,13 @@ export function computeWhitespace(
       for (const value of values) {
         const oursPct = oursDist.get(value) ?? 0;
         const theirsPct = theirsDist.get(value) ?? 0;
-        const pattern: WhitespacePattern = { category: key, value, oursPct, theirsPct };
+        const pattern: WhitespacePattern = {
+          category: key,
+          value,
+          oursPct,
+          theirsPct,
+          theirsByAdvertiser: evidenceByAdvertiser(theirs, column, value),
+        };
 
         if (
           oursPct > 0 &&
@@ -124,4 +202,42 @@ export function computeWhitespace(
     oursSampleSize: ours.length,
     theirsSampleSize: theirs.length,
   };
+}
+
+/**
+ * Whether a competitor pattern is the market's or one advertiser's.
+ *
+ * The question the per-ad percentage cannot answer. A hook at 18% of all
+ * competitor ads sounds like a market habit; if every one of those ads came
+ * from a single advertiser running fourteen persona pages, it is that
+ * advertiser's template. Two independent advertisers is the lowest bar worth
+ * calling a pattern — one is an anecdote.
+ *
+ * Unmeasured (no advertiser keys) returns false: an unproven claim should not
+ * inherit the confidence of a proven one.
+ */
+export function isMarketWide(
+  pattern: WhitespacePattern,
+  minAdvertisers = 2,
+): boolean {
+  const evidence = pattern.theirsByAdvertiser;
+  if (!evidence) return false;
+  return evidence.usedBy >= minAdvertisers;
+}
+
+/**
+ * Splits competitor patterns into those more than one advertiser runs and
+ * those that turn out to be a single advertiser's house style.
+ */
+export function partitionByAdvertiserBreadth(
+  patterns: WhitespacePattern[],
+  minAdvertisers = 2,
+): { marketWide: WhitespacePattern[]; singleAdvertiser: WhitespacePattern[] } {
+  const marketWide: WhitespacePattern[] = [];
+  const singleAdvertiser: WhitespacePattern[] = [];
+  for (const pattern of patterns) {
+    if (isMarketWide(pattern, minAdvertisers)) marketWide.push(pattern);
+    else singleAdvertiser.push(pattern);
+  }
+  return { marketWide, singleAdvertiser };
 }
