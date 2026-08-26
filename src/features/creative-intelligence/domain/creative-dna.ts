@@ -133,7 +133,7 @@ export const creativeDnaSchema = z.object({
   showsProduct: z.boolean().nullable(),
   textOnImage: z.boolean().nullable(),
   proofType: z.enum(PROOF_TYPES).nullable(),
-  dominantColors: z.array(z.string()).max(4),
+  dominantColors: z.array(z.string()),
   brightness: z.enum(BRIGHTNESS).nullable(),
 
   /**
@@ -144,7 +144,7 @@ export const creativeDnaSchema = z.object({
    * not. Without it the system recommends re-running a creative that caught a
    * good week.
    */
-  whyItWorks: z.array(z.string()).max(5),
+  whyItWorks: z.array(z.string()),
 });
 
 export type CreativeDna = z.infer<typeof creativeDnaSchema>;

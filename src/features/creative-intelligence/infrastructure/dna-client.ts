@@ -5,6 +5,7 @@ import {
   creativeDnaSchema,
   type CreativeDna,
 } from "@/features/creative-intelligence/domain/creative-dna";
+import { capList } from "@/lib/ai/cap-list";
 import { env } from "@/lib/env";
 
 const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
@@ -105,7 +106,12 @@ whyItWorks is the one field in your own words. List only what is REPEATABLE — 
   }
 
   return {
-    dna: parsed,
+    // See capList: the caps are storage preferences, so they trim.
+    dna: {
+      ...parsed,
+      whyItWorks: capList(parsed.whyItWorks, 5),
+      dominantColors: capList(parsed.dominantColors, 4),
+    },
     usage: {
       inputTokens: message.usage?.input_tokens ?? 0,
       outputTokens: message.usage?.output_tokens ?? 0,

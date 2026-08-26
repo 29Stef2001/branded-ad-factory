@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { WhitespaceResult } from "@/features/market-intelligence/domain/whitespace-analysis";
 import { dnaLabel } from "@/features/creative-intelligence/domain/creative-dna";
+import { capList } from "@/lib/ai/cap-list";
 import { env } from "@/lib/env";
 
 const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
@@ -18,7 +19,7 @@ const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
  */
 
 const narrativeSchema = z.object({
-  observations: z.array(z.string()).max(5),
+  observations: z.array(z.string()),
 });
 
 export type WhitespaceNarrativeResult = {
@@ -76,7 +77,8 @@ Write each observation as a plain statement of the pattern, e.g. "Competitors le
   }
 
   return {
-    observations: parsed.observations,
+    // See capList: trimmed, not rejected.
+    observations: capList(parsed.observations, 5),
     usage: {
       inputTokens: message.usage?.input_tokens ?? 0,
       outputTokens: message.usage?.output_tokens ?? 0,

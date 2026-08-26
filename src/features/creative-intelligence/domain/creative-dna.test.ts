@@ -64,13 +64,22 @@ describe("creativeDnaSchema", () => {
     ).toBeNull();
   });
 
-  it("caps the free-text lists so one analysis cannot run away", () => {
-    expect(() =>
-      creativeDnaSchema.parse(dna({ whyItWorks: Array(6).fill("reason") })),
-    ).toThrow();
-    expect(() =>
-      creativeDnaSchema.parse(dna({ dominantColors: Array(5).fill("#000") })),
-    ).toThrow();
+  it("accepts an over-long free-text list rather than losing the analysis", () => {
+    // This used to throw, and that was the wrong call. The caps on
+    // whyItWorks and dominantColors are storage preferences, not correctness
+    // constraints, and enforcing them here discarded whole paid analyses over
+    // a surplus item — 149 of 193 competitor DNA runs died on exactly this.
+    // The trimming moved to capList, applied where the result is returned;
+    // the schema now only rejects what is genuinely wrong, like a hook type
+    // outside the closed vocabulary.
+    expect(
+      creativeDnaSchema.parse(dna({ whyItWorks: Array(6).fill("reason") }))
+        .whyItWorks,
+    ).toHaveLength(6);
+    expect(
+      creativeDnaSchema.parse(dna({ dominantColors: Array(5).fill("#000") }))
+        .dominantColors,
+    ).toHaveLength(5);
   });
 });
 

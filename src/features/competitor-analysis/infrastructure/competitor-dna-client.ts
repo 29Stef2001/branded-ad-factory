@@ -5,6 +5,7 @@ import {
   competitorDnaSchema,
   type CompetitorDna,
 } from "@/features/competitor-analysis/domain/competitor-dna";
+import { capList } from "@/lib/ai/cap-list";
 import { env } from "@/lib/env";
 
 const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
@@ -66,7 +67,14 @@ observedFacts must be things literally present in the text: a quoted phrase, the
   }
 
   return {
-    dna: parsed,
+    // Trimmed rather than rejected — see capList. The prompt asks for at
+    // most five of each; a model that offers six has not made a mistake
+    // worth discarding a whole paid analysis over.
+    dna: {
+      ...parsed,
+      observedFacts: capList(parsed.observedFacts, 5),
+      inferredHypotheses: capList(parsed.inferredHypotheses, 5),
+    },
     usage: {
       inputTokens: message.usage?.input_tokens ?? 0,
       outputTokens: message.usage?.output_tokens ?? 0,

@@ -50,14 +50,14 @@ export const competitorDnaSchema = z.object({
    * Literally present in the copy: a quoted phrase, the stated CTA text, a
    * numeric claim. What a person could point to and say "yes, it says that."
    */
-  observedFacts: z.array(z.string()).max(5),
+  observedFacts: z.array(z.string()),
 
   /**
    * A reasoned judgement about strategy or audience — hedged, not asserted.
    * Ad Library gives no spend/CPA/ROAS, so nothing here may read as a
    * performance claim; these are about messaging, never about results.
    */
-  inferredHypotheses: z.array(z.string()).max(5),
+  inferredHypotheses: z.array(z.string()),
 });
 
 export type CompetitorDna = z.infer<typeof competitorDnaSchema>;
